@@ -5,6 +5,17 @@ import { dateFromNumber, numberFromDate } from "../editing";
 import { fold } from "../format";
 import { scoutingOverview, scoutingSuggest } from "./mockScouting";
 import type {
+  StaffEndingKind,
+  StaffReleasePreview,
+  InterestReason,
+  AdviceOptions,
+  AdviceTag,
+  Candidate,
+  ClubAdvice,
+  Need,
+  RoleAdvice,
+  StaffAdvice,
+  StaffPick,
   ApplyReport,
   AttributeBound,
   ClubMoney,
@@ -259,6 +270,8 @@ function details(player: PlayerSummary): PlayerDetails {
     ...player,
     heightCm: Math.round(168 + next() * 26),
     askingPrice: next() < 0.2 ? Math.round(next() * 40) * 1_000_000 : null,
+    // Roughly what a player of his ability is worth: the game's own value is read from memory.
+    value: Math.round((player.currentAbility / 200) ** 4 * 150_000_000),
     reputation: { home: Math.round(next() * 10000), current: Math.round(next() * 10000), world: Math.round(next() * 10000) },
     international: { caps: Math.round(next() * 90), goals: Math.round(next() * 30), u21Caps: Math.round(next() * 20), u21Goals: Math.round(next() * 8) },
     // The ratings behind the positions of the list row: the profile and the row agree.
@@ -1446,6 +1459,33 @@ function moveStaff(uid: number, clubUid: number, job?: number, terms: MoveTerms 
   return logStaff(member, "club", preview.from?.uid ?? 0, preview.to.uid, moved);
 }
 
+/** `plan_staff_release`: what is left of his contract, as the real command works it out; no finances in the fixtures. */
+function planStaffRelease(uid: number): StaffReleasePreview {
+  const member = movableStaff(uid);
+  const contract = staffDetails(member).contract;
+  const today = { year: 2026, month: 11, day: 7 };
+  const days = (d: FmDate) => Date.UTC(d.year, d.month - 1, d.day) / 86_400_000;
+  const expires = contract?.expires ?? null;
+  const weeksLeft = expires && days(expires) > days(today) ? Math.ceil((days(expires) - days(today)) / 7) : 0;
+  const wage = contract?.wage ?? 0;
+  const club = clubs.find((c) => c.uid === member.clubUid)!;
+  return {
+    club: { uid: club.uid, name: club.name },
+    severance: { wage, expires, weeksLeft, remaining: wage * weeksLeft },
+    balance: null,
+  };
+}
+
+function releaseStaff(uid: number, kind: StaffEndingKind, amount: number | undefined): LoggedChange {
+  const preview = planStaffRelease(uid);
+  const member = staff.find((s) => s.uid === uid)!;
+  staffUndo.set(changes.length + 1, { club: member.club, clubUid: member.clubUid, job: member.job });
+  member.club = null;
+  member.clubUid = null;
+  const paid = kind === "terminate" ? preview.severance.remaining : (amount ?? 0);
+  return logStaff(member, "club", preview.club.uid, 0, { from: preview.club.name, ending: { kind, paid } });
+}
+
 function changeStaffJob(uid: number, job: number): LoggedChange {
   const member = movableStaff(uid);
   givenJob(member.job);
@@ -2451,7 +2491,13 @@ function holds(bound: AttributeBound, value: number | undefined): boolean {
 /** The player filter of the real command: fields that are not set match everyone. */
 function matchesPlayerFilter(p: PlayerSummary, f: PlayerFilter): boolean {
   // The listings and the attributes are in the profile, made only when a filter asks for them.
-  const needsDetails = f.transferListed || f.loanListed || (f.attributes?.length ?? 0) > 0;
+  const needsDetails =
+    f.transferListed ||
+    f.loanListed ||
+    (f.attributes?.length ?? 0) > 0 ||
+    [f.minWage, f.maxWage, f.minAskingPrice, f.maxAskingPrice, f.minValue, f.maxValue].some(
+      (bound) => bound !== undefined,
+    );
   const d = needsDetails ? details(p) : null;
   return (
     (f.position === undefined || p.positions.includes(f.position)) &&
@@ -2459,6 +2505,11 @@ function matchesPlayerFilter(p: PlayerSummary, f: PlayerFilter): boolean {
     (f.maxAge === undefined || (p.age !== null && p.age <= f.maxAge)) &&
     (f.minCurrentAbility === undefined || p.currentAbility >= f.minCurrentAbility) &&
     (f.minPotentialAbility === undefined || p.potentialAbility >= f.minPotentialAbility) &&
+    (f.maxCurrentAbility === undefined || p.currentAbility <= f.maxCurrentAbility) &&
+    (f.maxPotentialAbility === undefined || p.potentialAbility <= f.maxPotentialAbility) &&
+    inBounds(d?.contract?.wage ?? null, f.minWage, f.maxWage) &&
+    inBounds(d?.askingPrice ?? null, f.minAskingPrice, f.maxAskingPrice) &&
+    inBounds(d?.value ?? null, f.minValue, f.maxValue) &&
     contains(p.nation, f.nation) &&
     contains(p.club, f.club) &&
     (f.clubUid === undefined || p.clubUid === f.clubUid) &&
@@ -2628,6 +2679,240 @@ const notSetUp = (): BridgeInfo => ({
   steamRunning: true,
   accounts: [{ id: "123456789", launchOptions: null, loadsBridge: false }],
 });
+/** The places of the advice, as the Rust side has them (see `advice.rs`). */
+const ADVICE_ROLES: { key: string; positions: string[]; wanted: number }[] = [
+  { key: "gk", positions: ["gk"], wanted: 2 },
+  { key: "dc", positions: ["dc", "sw"], wanted: 4 },
+  { key: "dl", positions: ["dl", "wbl"], wanted: 2 },
+  { key: "dr", positions: ["dr", "wbr"], wanted: 2 },
+  { key: "dm", positions: ["dm"], wanted: 2 },
+  { key: "mc", positions: ["mc"], wanted: 3 },
+  { key: "aml", positions: ["aml", "ml"], wanted: 2 },
+  { key: "amr", positions: ["amr", "mr"], wanted: 2 },
+  { key: "amc", positions: ["amc"], wanted: 1 },
+  { key: "st", positions: ["st"], wanted: 3 },
+];
+
+/** The staff jobs of the advice, as the Rust side has them. */
+const ADVICE_JOBS: { key: string; jobs: number[]; attributes: string[]; wanted: number }[] = [
+  {
+    key: "assistant",
+    jobs: [20],
+    attributes: ["tactical_knowledge", "judging_ability", "judging_potential", "people_management", "motivating"],
+    wanted: 1,
+  },
+  {
+    key: "coach",
+    jobs: [2],
+    attributes: ["attacking", "defending", "possession", "tactical", "technical", "determination"],
+    wanted: 3,
+  },
+  { key: "goalkeeping", jobs: [34], attributes: ["goalkeeping", "determination", "motivating"], wanted: 1 },
+  { key: "fitness", jobs: [26], attributes: ["fitness", "determination", "motivating"], wanted: 1 },
+  { key: "setPieces", jobs: [22], attributes: ["set_pieces", "tactical"], wanted: 1 },
+  { key: "physio", jobs: [50, 12], attributes: ["physiotherapy", "sports_science"], wanted: 2 },
+  { key: "sportsScience", jobs: [40, 48], attributes: ["sports_science", "physiotherapy"], wanted: 1 },
+  { key: "scout", jobs: [44, 14], attributes: ["judging_ability", "judging_potential", "tactical_knowledge"], wanted: 2 },
+  { key: "performance", jobs: [60], attributes: ["data_analysis", "tactical_knowledge"], wanted: 1 },
+  { key: "recruitment", jobs: [58], attributes: ["data_analysis", "judging_ability", "judging_potential"], wanted: 1 },
+  { key: "youth", jobs: [64], attributes: ["working_with_youngsters", "judging_potential", "determination"], wanted: 1 },
+  { key: "technicalDirector", jobs: [88], attributes: ["judging_staff", "judging_ability", "negotiating"], wanted: 1 },
+];
+
+/** How likely a fixture player is to come, as the Rust side estimates it (see `judge` in advice.rs), roughly. */
+function mockInterest(
+  player: PlayerSummary,
+  theirs: number | null,
+  ours: number,
+  starter: boolean,
+): Pick<Candidate, "interest" | "pros" | "cons"> {
+  const pros: InterestReason[] = [];
+  const cons: InterestReason[] = [];
+  let score = 50;
+  if (player.clubUid === null) {
+    score += 15;
+    pros.push("freeAgent");
+  } else if (theirs !== null && theirs > ours + 1000) {
+    score -= 25;
+    cons.push("stepDown");
+  } else if (theirs !== null && theirs < ours - 500) {
+    score += 12;
+    pros.push("stepUp");
+  }
+  if (starter) {
+    score += 10;
+    pros.push("starter");
+  }
+  if (player.uid % 5 === 0) {
+    score -= 15;
+    cons.push("ambitious");
+  }
+  return { interest: score >= 60 ? "likely" : score >= 40 ? "maybe" : "unlikely", pros, cons };
+}
+
+/** `club_advice`: a rough stand-in for the Rust advice, on the club of the fixture's human manager. */
+function clubAdvice(uid: number | null, options: AdviceOptions): ClubAdvice {
+  const clubUid = uid ?? staff.find((s) => s.isHuman)?.clubUid ?? null;
+  const club = clubs.find((c) => c.uid === clubUid);
+  if (!club) {
+    throw failure("advice.noClub", "The save names no club a human manager runs; pick one");
+  }
+  const squad = players.filter((p) => p.clubUid === club.uid);
+  const ratingAt = (p: PlayerSummary, positions: string[]) => Math.max(...positions.map((k) => ratings[p.uid]?.[k] ?? 0));
+  const best11 = squad
+    .map((p) => p.currentAbility)
+    .sort((a, b) => b - a)
+    .slice(0, 11);
+  const level = best11.length ? Math.floor(best11.reduce((a, b) => a + b, 0) / best11.length) : 0;
+  const mainOf = (p: PlayerSummary) => {
+    let best = -1;
+    let at = -1;
+    ADVICE_ROLES.forEach((r, i) => {
+      const rating = ratingAt(p, r.positions);
+      if (rating > best) {
+        best = rating;
+        at = i;
+      }
+    });
+    return best >= PLAYABLE_RATING ? at : -1;
+  };
+  const reputationOf = (uid: number | null) => clubs.find((c) => c.uid === uid)?.reputation ?? null;
+  const reachable = (uid: number | null) =>
+    !options.realistic || uid === null || (reputationOf(uid) ?? 0) <= (club.reputation ?? 0) + 1500;
+  const pool = players.filter(
+    (p) =>
+      p.clubUid !== club.uid && isWoman(p.uid) === club.women && (p.age ?? 99) <= options.maxAge && reachable(p.clubUid),
+  );
+
+  const roles = ADVICE_ROLES.map((role, index): RoleAdvice => {
+    const members = squad
+      .map((player) => ({ player, rating: ratingAt(player, role.positions), main: mainOf(player) === index }))
+      .filter((m) => m.rating >= PLAYABLE_RATING)
+      .sort((a, b) => b.player.currentAbility - a.player.currentAbility);
+    const cover = members.reduce((sum, m) => sum + (m.main ? 1 : 0.5), 0);
+    const bestAbility = members[0]?.player.currentAbility ?? null;
+    const need: Need =
+      members.length === 0 || cover < role.wanted / 2
+        ? "short"
+        : bestAbility !== null && bestAbility < level - 10
+          ? "weak"
+          : cover < role.wanted
+            ? "thin"
+            : "covered";
+    const targetAbility = need === "short" || need === "thin" ? Math.max(1, level - 10) : (bestAbility ?? 0) + 5;
+    const candidates = pool
+      .map((player): (Candidate & { score: number }) | null => {
+        const rating = ratingAt(player, role.positions);
+        const age = player.age ?? 30;
+        const prospect = age <= 21 && player.potentialAbility >= level + 5 && player.currentAbility + 40 >= level;
+        if (rating < PLAYABLE_RATING || (player.currentAbility < targetAbility && !prospect)) {
+          return null;
+        }
+        const tags: AdviceTag[] = [];
+        let score = player.currentAbility - targetAbility;
+        if (player.clubUid === null) {
+          tags.push("freeAgent");
+          score += 12;
+        }
+        if (player.uid % 7 === 0) {
+          tags.push("transferListed");
+          score += 10;
+        }
+        if (player.clubUid !== null && player.contractExpires && player.contractExpires.year <= GAME_DATE.year) {
+          tags.push("expiring");
+          score += 8;
+        }
+        if (prospect) {
+          tags.push("prospect");
+        }
+        if (age <= 23) {
+          score += Math.floor(Math.min(90, player.potentialAbility - player.currentAbility) / 3);
+        }
+        if (age >= 30) {
+          score -= (age - 29) * 4;
+        }
+        return {
+          player,
+          rating,
+          gain: player.currentAbility - (bestAbility ?? 0),
+          clubReputation: reputationOf(player.clubUid),
+          tags,
+          askingPrice: player.clubUid === null ? null : details(player).askingPrice,
+          // The fixtures' clubs are English: an English player is a local one.
+          domestic: player.nation === "England",
+          // A rough stand-in for the Rust side's estimate: a bigger club's players are less keen.
+          ...mockInterest(player, reputationOf(player.clubUid), club.reputation ?? 0, player.currentAbility >= (bestAbility ?? 0)),
+          score,
+        };
+      })
+      .filter((c): c is Candidate & { score: number } => c !== null)
+      .filter((c) => !options.interested || c.interest !== "unlikely")
+      .sort((a, b) => b.score - a.score || b.player.currentAbility - a.player.currentAbility)
+      .slice(0, options.perRole)
+      .map(({ score: _, ...candidate }) => candidate);
+    return { ...role, cover, need, bestAbility, targetAbility, members, candidates };
+  });
+
+  const pickOf = (member: StaffSummary, attributes: string[]): StaffPick => {
+    const d = staffDetails(member);
+    const values = attributes.map((key) => d.attributes[key]?.value ?? 0);
+    const placed = values.filter((v) => v > 0);
+    return {
+      member,
+      score: placed.length ? Math.floor((placed.reduce((a, b) => a + b, 0) * 10) / placed.length) : 0,
+      values,
+      clubReputation: reputationOf(member.clubUid),
+      tags: member.clubUid === null ? ["freeAgent"] : [],
+    };
+  };
+  const baseJob = (code: number) => (code > 1 && code % 2 === 1 ? code - 1 : code);
+  const freeBonus = (p: StaffPick) => p.score + (p.member.clubUid === null ? 15 : 0);
+  const advisedStaff = ADVICE_JOBS.map((role): StaffAdvice => {
+    const members = staff
+      .filter((m) => m.clubUid === club.uid && !m.isHuman && m.job !== null && role.jobs.includes(baseJob(m.job)))
+      .map((m) => pickOf(m, role.attributes))
+      .sort((a, b) => b.score - a.score);
+    const bestScore = members[0]?.score ?? null;
+    const need: Need =
+      members.length === 0
+        ? "short"
+        : bestScore !== null && bestScore < 120
+          ? members.length < role.wanted
+            ? "short"
+            : "weak"
+          : members.length < role.wanted
+            ? "thin"
+            : "covered";
+    const floor = need === "short" || need === "thin" ? Math.max(110, bestScore ?? 0) : (bestScore ?? 0) + 10;
+    const candidates = staff
+      .filter((m) => m.clubUid !== club.uid && !m.isHuman && reachable(m.clubUid))
+      .filter((m) => m.job === null || ![1, 4, 6, 16, 70].includes(baseJob(m.job)))
+      .map((m) => pickOf(m, role.attributes))
+      .filter((p) => p.score >= floor)
+      .sort((a, b) => freeBonus(b) - freeBonus(a))
+      .slice(0, options.perRole);
+    return { ...role, need, bestScore, members, candidates };
+  });
+
+  const ages = squad.map((p) => p.age).filter((a): a is number => a !== null);
+  return {
+    club,
+    finances: club.women ? null : clubDetails(club).finances,
+    team: 0,
+    teams: [{ index: 0, kind: 0, ageLimit: null, players: squad.length }],
+    squadSize: squad.length,
+    averageAge: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
+    level,
+    roles,
+    staff: advisedStaff,
+  };
+}
+
+/** Whether `value` lies within the bounds given: always without bounds, never without a value. */
+const inBounds = (value: number | null, min: number | undefined, max: number | undefined) =>
+  (min === undefined && max === undefined) ||
+  (value !== null && (min === undefined || value >= min) && (max === undefined || value <= max));
+
 let mockBridge = notSetUp();
 
 export async function mockInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -2962,6 +3247,18 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
         args?.job as number | undefined,
         (args?.terms ?? {}) as MoveTerms,
       ) as T;
+    case "club_staff":
+      return staff
+        .filter((s) => s.clubUid === Number(args?.club))
+        .sort((a, b) => b.currentAbility - a.currentAbility) as T;
+    case "plan_staff_release":
+      return planStaffRelease(Number(args?.uid)) as T;
+    case "release_staff":
+      return releaseStaff(
+        Number(args?.uid),
+        args?.kind as StaffEndingKind,
+        args?.amount === undefined || args?.amount === null ? undefined : Number(args.amount),
+      ) as T;
     case "change_staff_job":
       return changeStaffJob(Number(args?.uid), Number(args?.job)) as T;
     case "plan_club_swap":
@@ -3011,6 +3308,15 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       return scoutingSuggest({ players, clubs, ratings, women }, (args?.request ?? {}) as ScoutRequest) as T;
     case "club_squads":
       return clubSquads(Number(args?.uid)) as T;
+    case "human_club_nation":
+      // The fixture clubs are made up: no country, so the currency stays as chosen.
+      return null as T;
+    case "human_clubs": {
+      const human = staff.find((s) => s.isHuman)?.clubUid;
+      return (human == null ? [] : [human]) as T;
+    }
+    case "club_advice":
+      return clubAdvice((args?.club as number | null) ?? null, args?.options as AdviceOptions) as T;
     case "set_captain":
       return setCaptain(Number(args?.club), Number(args?.team), args?.role as CaptainRole, Number(args?.uid)) as T;
     case "team_action":

@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AdviceView } from "./AdviceView";
 import { call, inTauri } from "./api";
 import { BridgeSetup } from "./BridgeSetup";
 import { ChangesView, useChangeLog } from "./ChangesView";
 import { ClubBrowser } from "./ClubBrowser";
 import { CompatibilityNotice } from "./CompatibilityNotice";
 import { forgetFieldTables } from "./fieldTables";
+import { currencyForSave } from "./currency";
 import { describeError, describeGame, formatDate } from "./format";
 import { FrozenNotice } from "./FrozenNotice";
 import { GraphicsStatus } from "./GraphicsStatus";
 import { SettingsMenu } from "./SettingsMenu";
-import { appText, changesText, clubListText, playerListText, scoutingText, staffListText } from "./labels";
+import { adviceText, appText, changesText, clubListText, playerListText, scoutingText, staffListText } from "./labels";
 import { PlayerBrowser } from "./PlayerBrowser";
 import { restored, useSnapshot } from "./restore";
 import { ScoutingBrowser } from "./ScoutingBrowser";
@@ -21,13 +23,14 @@ import { ComparisonContext, useComparison } from "./useComparison";
 import { askToLeave, EditorContext } from "./useProfileEditing";
 import "./App.css";
 
-type View = "players" | "staff" | "clubs" | "scouting" | "changes";
+type View = "players" | "staff" | "clubs" | "scouting" | "advice" | "changes";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "players", label: playerListText.nav },
   { id: "staff", label: staffListText.nav },
   { id: "clubs", label: clubListText.nav },
   { id: "scouting", label: scoutingText.nav },
+  { id: "advice", label: adviceText.nav },
   { id: "changes", label: changesText.nav },
 ];
 
@@ -100,6 +103,10 @@ function App() {
       setConnection(connected);
       setRefrozen(again ?? null);
       setDataVersion((v) => v + 1);
+      // Money in the currency of the managed club's country, unless the user chose one.
+      void call<string | null>("human_club_nation")
+        .then(currencyForSave)
+        .catch(() => {});
     });
 
   const reload = () =>
@@ -263,6 +270,7 @@ function App() {
                 <StaffBrowser version={dataVersion} active={view === "staff"} genderKnown={connection.genderKnown} />
                 <ClubBrowser version={dataVersion} active={view === "clubs"} />
                 <ScoutingBrowser version={dataVersion} active={view === "scouting"} />
+                <AdviceView version={dataVersion} active={view === "advice"} />
                 {view === "changes" && <ChangesView log={log} error={logError} reload={reloadLog} onUndone={edited} />}
               </div>
             </ComparisonContext.Provider>

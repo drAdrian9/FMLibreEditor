@@ -1,10 +1,12 @@
 import { Fragment, useContext, useEffect, useId, useState, type ReactNode } from "react";
 import { AttributeActions } from "./AttributeActions";
+import { createPortal } from "react-dom";
 import { EditableValue } from "./EditControls";
 import { changeStaffJob, offeredStaffJobs } from "./editing";
 import { describeError } from "./format";
 import { jobLabel, profileText, STAFF_ATTRIBUTE_LABELS, type StaffAttributeKey } from "./labels";
 import { MoveButton } from "./MoveDialog";
+import { StaffReleaseButton } from "./StaffReleaseDialog";
 import { ClubLogo, NationFlag, PersonFace, PICTURE_SIZE, WithPicture } from "./Picture";
 import {
   attributeRow,
@@ -86,10 +88,29 @@ interface StaffProfileProps {
   /** Changes when the game data is read again, so the profile is too. */
   version: number;
   onClose: () => void;
+  /** A dialog over the window instead of a panel beside the staff list (see `StaffDialog`). */
+  modal?: boolean;
+}
+
+/** The profile of a member of staff named in the advice, as a dialog over the window, like `PlayerDialog`. */
+export function StaffDialog({ member, version, onClose }: Omit<StaffProfileProps, "modal">) {
+  return createPortal(
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          event.preventDefault();
+        }
+      }}
+    >
+      <StaffProfile key={member.uid} member={member} version={version} onClose={onClose} modal />
+    </div>,
+    document.body,
+  );
 }
 
 /** The profile of one member of staff. Mount it with `key={uid}` so a new person starts at the top. */
-export function StaffProfile({ member, version, onClose }: StaffProfileProps) {
+export function StaffProfile({ member, version, onClose, modal }: StaffProfileProps) {
   const loaded = useProfileDetails<StaffDetails>("staff_details", member.uid, version);
   const editing = useProfileEditing("staff", member.uid);
   const details = loaded?.details;
@@ -117,6 +138,7 @@ export function StaffProfile({ member, version, onClose }: StaffProfileProps) {
       vitals={vitals}
       currentAbility={info.currentAbility}
       potentialAbility={info.potentialAbility}
+      modal={modal}
       loaded={loaded}
       onClose={onClose}
       editing={editing}
@@ -125,12 +147,19 @@ export function StaffProfile({ member, version, onClose }: StaffProfileProps) {
         editing.editable &&
         editing.stage === "view" &&
         !info.isHuman && (
-          <MoveButton
-            kind="staff"
-            player={{ uid: info.uid, name: info.name, club: info.club, clubUid: info.clubUid, job: info.job }}
-            contract={null}
-            ready={details !== undefined}
-          />
+          <>
+            <MoveButton
+              kind="staff"
+              player={{ uid: info.uid, name: info.name, club: info.club, clubUid: info.clubUid, job: info.job }}
+              contract={null}
+              ready={details !== undefined}
+            />
+            {info.club !== null && (
+              <StaffReleaseButton
+                member={{ uid: info.uid, name: info.name, club: info.club, clubUid: info.clubUid }}
+              />
+            )}
+          </>
         )
       }
     >

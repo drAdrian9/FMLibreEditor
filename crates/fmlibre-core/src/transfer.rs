@@ -1502,6 +1502,37 @@ impl Session {
         Ok(paid)
     }
 
+    /// Works out what paying `amount` out of `club`'s balance does to it, as when the club ends a contract early; none
+    /// when the game keeps no full finances for the club. Nothing is written.
+    pub fn plan_payment(&self, club: &ClubSummary, amount: i64) -> Result<Option<Amounts>, EditError> {
+        if !(0..=MAX_FEE).contains(&amount) {
+            return Err(EditError::OutOfRange { field: "payment".to_owned(), value: amount, min: 0, max: MAX_FEE });
+        }
+        let balance = self.field(Entity::Club, "finance.balance")?;
+        let before = match self.read_field(&club.target(), &balance) {
+            Ok(value) => value,
+            Err(EditError::NoRecord { .. }) => return Ok(None),
+            Err(err) => return Err(err),
+        };
+        let after = before - amount;
+        if !balance.takes(after) {
+            let (min, max) = (balance.min, balance.max);
+            return Err(EditError::OutOfRange { field: balance.key.clone(), value: after, min, max });
+        }
+        Ok(Some(Amounts { before, after }))
+    }
+
+    /// Pays what [`Session::plan_payment`] worked out, while the game still holds the balance it was worked out from.
+    /// Taken back with [`Session::refund_fee`].
+    pub fn pay(&self, club: &ClubSummary, amounts: Amounts) -> Result<Vec<Paid>, EditError> {
+        if amounts.before == amounts.after {
+            return Ok(Vec::new());
+        }
+        let balance = self.field(Entity::Club, "finance.balance")?;
+        self.write_field_if(&club.target(), &balance, amounts.before, amounts.after)?;
+        Ok(vec![Paid { target: club.target(), field: balance, change: amounts.after - amounts.before }])
+    }
+
     /// Takes back what a fee changed, each amount by its change from what the game holds now, kept within what the
     /// field holds. When one cannot be taken back, those already taken back are paid again.
     pub fn refund_fee(&self, paid: &[Paid]) -> Result<(), EditError> {

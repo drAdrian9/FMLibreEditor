@@ -547,6 +547,13 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
         {change.moved?.with !== undefined && <div className="sub">{text.swappedWith(change.moved.with)}</div>}
         {change.moved?.released !== undefined && <div className="sub">{text.released(change.moved.released)}</div>}
         {change.moved?.fee !== undefined && <div className="sub">{text.fee(formatMoney(change.moved.fee))}</div>}
+        {change.moved?.ending !== undefined && (
+          <div className="sub">
+            {change.moved.ending.kind === "terminate"
+              ? text.terminated(formatMoney(change.moved.ending.paid))
+              : text.mutualEnd(formatMoney(change.moved.ending.paid))}
+          </div>
+        )}
         {change.recall !== undefined && (
           <div className="sub">{text.optionRemoved(formatMoney(change.recall.optionFee))}</div>
         )}

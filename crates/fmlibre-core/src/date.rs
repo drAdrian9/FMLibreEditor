@@ -76,7 +76,7 @@ impl FmDate {
     }
 }
 
-fn is_leap(year: u16) -> bool {
+pub(crate) fn is_leap(year: u16) -> bool {
     (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 

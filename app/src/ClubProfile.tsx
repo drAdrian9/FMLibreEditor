@@ -24,19 +24,21 @@ import {
   type PanelIds,
   type RatingRow,
 } from "./ProfileParts";
+import { ClubStaffTab } from "./ClubStaffTab";
 import { SquadTab } from "./SquadTab";
 import type { ClubDetails, ClubSummary, Finances, Stadium, StadiumName } from "./types";
 import { EditorContext, useProfileEditing } from "./useProfileEditing";
 
 const text = clubProfileText;
 
-/** The tabs of the profile: what the club has, its squad, and its stadium. */
-export type ClubTab = "overview" | "squad" | "stadium";
+/** The tabs of the profile: what the club has, its squad, its staff and its stadium. */
+export type ClubTab = "overview" | "squad" | "staff" | "stadium";
 
-const TABS: readonly ClubTab[] = ["overview", "squad", "stadium"];
+const TABS: readonly ClubTab[] = ["overview", "squad", "staff", "stadium"];
 
 /** The tab saved before the language was switched; the overview when there is none. */
-export const readTab = (value: unknown): ClubTab => (value === "squad" || value === "stadium" ? value : "overview");
+export const readTab = (value: unknown): ClubTab =>
+  value === "squad" || value === "staff" || value === "stadium" ? value : "overview";
 
 interface ClubProfileProps {
   /** The row that was picked; its fields fill the header while the full profile loads. */
@@ -87,7 +89,7 @@ export function ClubProfile({ club, version, tab, onTab, onClose }: ClubProfileP
         </div>
       }
       tabs={details && <ClubTabs tab={shown} base={base} locked={locked} onSelect={onTab} />}
-      wide={details !== undefined && shown === "squad"}
+      wide={details !== undefined && shown !== "overview"}
       loaded={loaded}
       onClose={onClose}
       editing={editing}
@@ -95,6 +97,8 @@ export function ClubProfile({ club, version, tab, onTab, onClose }: ClubProfileP
       {details &&
         (shown === "squad" ? (
           <SquadTab clubUid={club.uid} version={version} panel={panel} />
+        ) : shown === "staff" ? (
+          <ClubStaffTab clubUid={club.uid} version={version} panel={panel} />
         ) : shown === "stadium" ? (
           <StadiumTab club={club.uid} stadium={details.stadium} panel={panel} />
         ) : (
@@ -117,7 +121,7 @@ interface ClubTabsProps {
 function ClubTabs({ tab, base, locked, onSelect }: ClubTabsProps) {
   const buttons = useRef<Partial<Record<ClubTab, HTMLButtonElement | null>>>({});
   // The Squad tab is out of reach while the club is edited.
-  const offered = TABS.filter((id) => !(locked && id === "squad"));
+  const offered = TABS.filter((id) => !(locked && id !== "overview"));
 
   const keyDown = (event: KeyboardEvent) => {
     const at = offered.indexOf(tab);
@@ -141,7 +145,7 @@ function ClubTabs({ tab, base, locked, onSelect }: ClubTabsProps) {
   return (
     <div className="profile-tabs" role="tablist" aria-label={text.tabsLabel} onKeyDown={keyDown}>
       {TABS.map((id) => {
-        const unavailable = locked && id === "squad";
+        const unavailable = locked && id !== "overview";
         return (
           <button
             key={id}

@@ -508,7 +508,7 @@ function TraitsGroup({ traits }: { traits: number[] }) {
 
 /** International record, reputation and asking price, and the retirement the game plans for the player. */
 function CareerGroup({ details }: { details: PlayerDetails }) {
-  const { international, reputation, askingPrice } = details;
+  const { international, reputation, askingPrice, value } = details;
   return (
     <section className="profile-group">
       <h3>{profileText.career}</h3>
@@ -525,6 +525,11 @@ function CareerGroup({ details }: { details: PlayerDetails }) {
           </Fact>
           <Fact label={profileText.u21Goals}>
             <EditableValue field="international.u21_goals">{international.u21Goals}</EditableValue>
+          </Fact>
+          <Fact label={profileText.transferValue}>
+            <span title={profileText.transferValueTitle}>
+              {value === null ? profileText.notSet : formatMoney(value)}
+            </span>
           </Fact>
           <Fact label={profileText.askingPrice}>
             <EditableValue field="asking_price">

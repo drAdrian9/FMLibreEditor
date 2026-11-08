@@ -96,7 +96,7 @@ const MAX_TEXT_LENGTH = 200;
 const DATE_TEXT = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A number as a number input holds it: empty, or something `Number` reads. */
-const isNumberText = (text: string) => text.trim() === "" || Number.isFinite(Number(text));
+export const isNumberText = (text: string) => text.trim() === "" || Number.isFinite(Number(text));
 
 /** `value` when it is a text that `fits`, `fallback` otherwise. */
 export function textOr(value: unknown, fallback: string, fits: (text: string) => boolean = () => true): string {

@@ -3,6 +3,8 @@
 import { call } from "./api";
 import { converts, toPounds, toShown } from "./currency";
 import type {
+  StaffEndingKind,
+  StaffReleasePreview,
   ApplyReport,
   BatchUndo,
   CaptainRole,
@@ -256,6 +258,20 @@ export const planRelease = (uid: number) => call<ClubName>("plan_release", { uid
  * like a move.
  */
 export const releasePlayer = (uid: number) => call<LoggedChange>("release_player", { uid });
+
+/**
+ * Checks that the member of staff can be released, and works out what is left of his contract and what paying
+ * `amount` pounds (what is left, when not given) does to his club's balance. Nothing is written.
+ */
+export const planStaffRelease = (uid: number, amount?: number) =>
+  call<StaffReleasePreview>("plan_staff_release", { uid, amount });
+
+/**
+ * Releases the member of staff: on `terminate` his club pays what is left of his contract, on `mutual` the `amount`
+ * agreed, in pounds. Logged and undone like any change, the money with it.
+ */
+export const releaseStaff = (uid: number, kind: StaffEndingKind, amount?: number) =>
+  call<LoggedChange>("release_staff", { uid, kind, amount });
 
 /**
  * Points the player's tie `index` at another nation or club (by UID), and gives a training another homegrown rule;
