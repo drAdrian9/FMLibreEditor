@@ -1796,7 +1796,7 @@ export const es: Strings = {
     staffJob: "Puesto",
     staffJobChoose: "Elige un puesto…",
     staffTeam: "Equipo",
-    staffTeamHint: "El personal de la cantera (Sub-21, Sub-18) trabaja para ese equipo; el mánager y el director deportivo, solo para el primer equipo.",
+    staffTeamHint: "El personal de la cantera (Sub-21, Sub-18), su mánager incluido, trabaja para ese equipo; el director deportivo, para el club.",
     staffJobKept: (job) => `${job} (lo conserva)`,
     staffNewJob:
       "Ocupa el nuevo puesto y conserva el salario y el fin de contrato; el contrato lleva la fecha del día del juego.",

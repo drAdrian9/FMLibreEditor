@@ -424,7 +424,7 @@ impl Session {
         let employer = if team == 0 {
             senior
         } else {
-            if !matches!(post, Post::Department(_)) {
+            if post == Post::DirectorOfFootball {
                 return Err(MoveError::NoTeam { index: team });
             }
             let teams = PointerList::read(process, club.address + layout.club.teams)?
@@ -438,7 +438,18 @@ impl Session {
         // Where he joins first: a club's place for a director of football that is taken refuses him before the pool
         // is looked at.
         let (mut joining, mut grow) = (Patches::default(), Vec::new());
-        self.join_post(club.address, post, object, &mut joining, &mut grow)?;
+        if post == Post::Manager && employer != senior {
+            // An academy team's manager is in the club's coaching staff, as a senior team's is not, and in his team's
+            // place for a manager (Arsenal's under-21s and under-18s managers, Steam build, 8 November 2026).
+            let offset = layout.team.manager.ok_or(MoveError::UnusualJob { job })?;
+            match process.read_u64(employer + offset)? {
+                0 => patches_push(&mut joining, employer + offset, object),
+                held => return Err(MoveError::ManagerTaken { uid: self.staff_uid(held) }),
+            }
+            self.join_post(club.address, Post::Department(Department::Coaching), object, &mut joining, &mut grow)?;
+        } else {
+            self.join_post(club.address, post, object, &mut joining, &mut grow)?;
+        }
 
         let model = self.staff_model_contract(club.address, senior, member, job, post)?;
         let pool = self.pool_holding(model, size)?;
@@ -982,4 +993,9 @@ mod tests {
         let at = layout.club.director_of_football.expect("placed on Windows");
         assert!(at + 8 <= CLUB_BYTES as u64, "check_unheld must skip it, not miss it");
     }
+}
+
+/// Puts `object` in the empty pointer place at `at`.
+fn patches_push(patches: &mut Patches, at: u64, object: u64) {
+    patches.push(at, 0u64.to_le_bytes(), object.to_le_bytes());
 }

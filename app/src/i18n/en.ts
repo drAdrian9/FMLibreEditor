@@ -1922,7 +1922,7 @@ export const en = {
     staffJob: "Job",
     staffJobChoose: "Choose a job…",
     staffTeam: "Team",
-    staffTeamHint: "An academy's staff (U21, U18) work for that team; a manager and a director of football for the first team only.",
+    staffTeamHint: "An academy's staff (U21, U18), its manager too, work for that team; a director of football for the club.",
     /** After the name of their own job in that select. */
     staffJobKept: (job: string) => `${job} (keeps it)`,
     /** In the place of `staffContract` when another job is chosen. */
