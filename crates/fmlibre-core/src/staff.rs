@@ -103,8 +103,7 @@ pub struct StaffSummary {
     /// the layout does not place.
     #[serde(skip)]
     pub attributes: Vec<u8>,
-    /// When the contract ends, for the list's filter.
-    #[serde(skip)]
+    /// When the contract ends: for the list's filter, and the club's Staff tab.
     pub contract_expires: Option<FmDate>,
     /// Whether this is a woman, for the list's filter; unknown where the layout does not place the gender flags.
     #[serde(skip)]

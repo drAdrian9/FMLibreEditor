@@ -13,8 +13,10 @@
 //! [`ClubLayout`]: crate::ClubLayout
 
 use fmlibre_mem::is_user_pointer;
+use serde::Serialize;
 
 use crate::clubs::ClubSummary;
+use crate::date::FmDate;
 use crate::edit::Kind;
 use crate::profile::Layout;
 use crate::session::Session;
@@ -98,6 +100,38 @@ pub struct StaffChange {
     pub to_club: u32,
     pub job: (u8, u8),
     patches: Vec<Patch>,
+}
+
+/// What is left of a member of staff's contract, which ending it early costs his club: his wage for every week until it
+/// expires. A contract without an end date, or one the game has not dated, has nothing left to pay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Severance {
+    /// Pounds per week.
+    pub wage: i32,
+    pub expires: Option<FmDate>,
+    /// Whole weeks from today until it expires, rounded up; 0 when it has none or the date is unknown.
+    pub weeks_left: i64,
+    /// `wage` times `weeks_left`, in pounds.
+    pub remaining: i64,
+}
+
+impl Severance {
+    fn new(wage: i32, expires: Option<FmDate>, today: Option<FmDate>) -> Self {
+        let weeks_left = match (expires, today) {
+            (Some(expires), Some(today)) if expires > today => (days_between(today, expires) + 6) / 7,
+            _ => 0,
+        };
+        let wage = wage.max(0);
+        Severance { wage, expires, weeks_left, remaining: i64::from(wage) * weeks_left }
+    }
+}
+
+/// Days from `from` to `to`.
+fn days_between(from: FmDate, to: FmDate) -> i64 {
+    let year_length = |year: u16| if crate::date::is_leap(year) { 366 } else { 365 };
+    let years: i64 = (from.year..to.year).map(year_length).sum();
+    years + i64::from(to.day_of_year()) - i64::from(from.day_of_year())
 }
 
 /// What ties a member of staff to his club, checked.
@@ -184,6 +218,95 @@ impl Session {
             from_club: holder.club_uid,
             to_club: holder.club_uid,
             job: (holder.job, job),
+            patches: patches.0,
+        })
+    }
+
+    /// Works out releasing `member` from his club: he leaves every department list of it that holds him, and has no
+    /// contract after, as the game's own staff without a club have. His contract is left as it was: nothing else in
+    /// the game points at it. With the plan comes what is left of his contract. Nothing is written.
+    pub fn plan_staff_release(&self, member: &StaffSummary) -> Result<(StaffPlan, Severance), MoveError> {
+        let holder = self.staff_holder(member)?;
+        let c = &self.layout.contract;
+        let mut patches = Patches::default();
+        for (_, list, index, elements) in &holder.lists {
+            removal_patches(list, *index, elements, &mut patches);
+        }
+        // Only once no list holds him: the game may follow a member of a department to his contract.
+        let at = holder.object + self.layout.staff.contract;
+        patches.push(at, holder.contract.to_le_bytes(), 0u64.to_le_bytes());
+
+        let field = |offset: u64, len: usize| &holder.record[offset as usize..offset as usize + len];
+        let wage = i32::from_le_bytes(field(c.wage, 4).try_into().expect("4 bytes"));
+        let expires = FmDate::from_number(Kind::Date.decode(field(c.expires, 4)));
+        let severance = Severance::new(wage, expires, self.game_date());
+        let plan = StaffPlan {
+            member: member.uid,
+            from_club: holder.club_uid,
+            to_club: 0,
+            job: (holder.job, holder.job),
+            patches: patches.0,
+        };
+        Ok((plan, severance))
+    }
+
+    /// Works out signing `free`, a member of staff without a contract, in the place of `replaced` at his club: the editor
+    /// allocates nothing, so `free` takes over the contract of `replaced` (its job, wage and end date, signed and
+    /// joined from today) and his place in every department list that holds him, and `replaced` is left with no
+    /// contract, as a release leaves him. Nothing is written.
+    pub fn plan_staff_sign(&self, free: &StaffSummary, replaced: &StaffSummary) -> Result<StaffPlan, MoveError> {
+        let (process, layout) = (&self.process, &self.layout);
+        let s = &layout.staff;
+        if free.is_human || free.shift != 0 {
+            return Err(MoveError::You);
+        }
+        if process.read_u32(free.address + s.uid)? != free.uid {
+            return Err(MoveError::Moved { uid: free.uid });
+        }
+        if process.read_u64(free.address + s.contract)? != 0 {
+            return Err(MoveError::Employed);
+        }
+        let holder = self.staff_holder(replaced)?;
+        let woman = |member: &StaffSummary| member.woman;
+        if woman(free).is_some() && woman(replaced).is_some() && woman(free) != woman(replaced) {
+            return Err(MoveError::MenAndWomen);
+        }
+        let free_object = free.address;
+
+        let mut patches = Patches::default();
+        for (_, list, index, elements) in &holder.lists {
+            if elements.contains(&free_object) {
+                return Err(MoveError::NotInDepartment);
+            }
+            let at = list.begin_address() + 8 * *index as u64;
+            patches.push(at, holder.object.to_le_bytes(), free_object.to_le_bytes());
+        }
+        // The contract changes hands: it points back at its new holder, who points at it, and the old one at none.
+        let c = &layout.contract;
+        patches.push(
+            holder.contract + c.owner,
+            (holder.object + s.identity()).to_le_bytes(),
+            (free_object + s.identity()).to_le_bytes(),
+        );
+        patches.push(holder.object + s.contract, holder.contract.to_le_bytes(), 0u64.to_le_bytes());
+        patches.push(free_object + s.contract, 0u64.to_le_bytes(), holder.contract.to_le_bytes());
+        if let Some(today) = self.game_date() {
+            let at = |offset: u64| &holder.record[offset as usize..offset as usize + 4];
+            for offset in [c.signed, c.joined] {
+                if Kind::Date.decode(at(offset)) != 0 {
+                    patches.push(
+                        holder.contract + offset,
+                        at(offset),
+                        Kind::Date.encode(today.to_number(), at(offset)),
+                    );
+                }
+            }
+        }
+        Ok(StaffPlan {
+            member: free.uid,
+            from_club: 0,
+            to_club: holder.club_uid,
+            job: (holder.job, holder.job),
             patches: patches.0,
         })
     }
@@ -325,6 +448,21 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn what_is_left_of_a_contract_is_its_wage_for_each_week_to_go() {
+        let date = |year, month, day| Some(FmDate { year, month, day });
+        let left = Severance::new(1_000, date(2027, 6, 30), date(2026, 11, 7));
+        assert_eq!(left.weeks_left, 34, "235 days, rounded up to whole weeks");
+        assert_eq!(left.remaining, 34_000);
+        assert_eq!(Severance::new(1_000, date(2028, 1, 1), date(2027, 12, 31)).weeks_left, 1);
+        assert_eq!(Severance::new(1_000, date(2026, 1, 1), date(2026, 11, 7)).remaining, 0, "already over");
+        assert_eq!(Severance::new(1_000, None, date(2026, 11, 7)).remaining, 0, "no end date");
+        assert_eq!(
+            days_between(FmDate { year: 2027, month: 12, day: 31 }, FmDate { year: 2028, month: 12, day: 31 }),
+            366
+        );
+    }
 
     #[test]
     fn every_job_has_one_department_and_none_is_a_player_coach() {

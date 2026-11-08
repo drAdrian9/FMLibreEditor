@@ -506,7 +506,7 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
   // injuries from how many he had to none, and lifting his bans as one of his bans: "Healed 2 injuries" says it better
   // than "2 → 0". Keeping him from retiring is logged with the date he was to retire on, which it names.
   const value = change.moved
-    ? valueChange(change.moved.from, change.moved.to ?? profileText.freeAgent)
+    ? valueChange(change.moved.from || profileText.freeAgent, change.moved.to ?? profileText.freeAgent)
     : change.captaincy
       ? valueChange(change.captaincy.from ?? profileText.none, change.captaincy.to)
       : change.tie
@@ -543,6 +543,13 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
         {change.moved?.with !== undefined && <div className="sub">{text.swappedWith(change.moved.with)}</div>}
         {change.moved?.released !== undefined && <div className="sub">{text.released(change.moved.released)}</div>}
         {change.moved?.fee !== undefined && <div className="sub">{text.fee(formatMoney(change.moved.fee))}</div>}
+        {change.moved?.ending !== undefined && (
+          <div className="sub">
+            {change.moved.ending.kind === "terminate"
+              ? text.terminated(formatMoney(change.moved.ending.paid))
+              : text.mutualEnd(formatMoney(change.moved.ending.paid))}
+          </div>
+        )}
         {captaincyNotes(change).map((note) => (
           <div key={note} className="sub">
             {note}

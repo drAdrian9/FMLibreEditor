@@ -58,6 +58,10 @@ traits = 0x348
 # over his injuries keeps the record with an empty list.
 injuries = 0xF8
 asking_price = 0x238      # i32, pounds; -1 when not set
+# i32, pounds: the transfer value FM shows, which it shows as a range where it knows the player less. Found
+# with `related` on the Steam build (7 November 2026): Persija's Rafael William 49,452 (shown Rp 1.2B),
+# Arlyansyah Abdulmanan 13,075 (Rp 300M-550M), Dony Tri Pamungkas 42,887 (Rp 180M-1.5B); Mbappé 184,705,856.
+value = 0x234
 home_reputation = 0x25E   # u16
 current_reputation = 0x260
 world_reputation = 0x262

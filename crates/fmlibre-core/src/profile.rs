@@ -198,6 +198,9 @@ pub struct PlayerLayout {
     pub gender: Option<u64>,
     pub height: u64,
     pub asking_price: u64,
+    /// `i32`, pounds: the transfer value the game shows; only in the layouts it has been checked in.
+    #[serde(default)]
+    pub value: Option<u64>,
     pub home_reputation: u64,
     pub current_reputation: u64,
     pub world_reputation: u64,

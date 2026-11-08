@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { PLAYER_ATTRIBUTES } from "./AttributeFilters";
-import { readPersonFields, textOr } from "./FilterBar";
+import { isNumberText, readPersonFields, textOr } from "./FilterBar";
 import { intlLocale } from "./i18n";
 import { NO_PLAYER_FILTERS, POSITION_ORDER, type PlayerFilterFields } from "./PlayerFilters";
 import { isRecord } from "./restore";
@@ -70,6 +70,14 @@ export function readFields(value: unknown): PlayerFilterFields {
     freeAgents: typeof given.freeAgents === "boolean" ? given.freeAgents : none.freeAgents,
     transferListed: typeof given.transferListed === "boolean" ? given.transferListed : none.transferListed,
     loanListed: typeof given.loanListed === "boolean" ? given.loanListed : none.loanListed,
+    maxCurrentAbility: textOr(given.maxCurrentAbility, none.maxCurrentAbility, isNumberText),
+    maxPotentialAbility: textOr(given.maxPotentialAbility, none.maxPotentialAbility, isNumberText),
+    minWage: textOr(given.minWage, none.minWage, isNumberText),
+    maxWage: textOr(given.maxWage, none.maxWage, isNumberText),
+    minAskingPrice: textOr(given.minAskingPrice, none.minAskingPrice, isNumberText),
+    maxAskingPrice: textOr(given.maxAskingPrice, none.maxAskingPrice, isNumberText),
+    minValue: textOr(given.minValue, none.minValue, isNumberText),
+    maxValue: textOr(given.maxValue, none.maxValue, isNumberText),
   };
 }
 

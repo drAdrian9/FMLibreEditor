@@ -4568,3 +4568,296 @@ button.danger:hover:not(:disabled) {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Advisor */
+
+/* The view scrolls as a whole: the summary, the list of places and the tables of the one picked. */
+.players.advice {
+  overflow: auto;
+  padding-bottom: 18px;
+}
+
+.advice-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.advice-option.check {
+  cursor: pointer;
+}
+
+.advice-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 22px;
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-variant-numeric: tabular-nums;
+}
+
+.advice-summary small {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advice-tabs {
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+/* The places (or jobs) on the left, the one picked on the right; one above the other in a narrow window. */
+.advice-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.advice-body.stale {
+  opacity: 0.6;
+}
+
+@media (max-width: 900px) {
+  .advice-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advice-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--field);
+  color: var(--text);
+  text-align: left;
+}
+
+.advice-item:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+
+.advice-item.picked {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.advice-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.advice-item-name {
+  font-weight: 750;
+}
+
+.advice-item-sub,
+.advice-item-facts {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advice-item-facts {
+  display: flex;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* How badly a place wants someone, on FM's bands: short is the worst band, covered the best. */
+.need {
+  padding: 0 6px;
+  border-radius: 2px;
+  color: var(--on-tier);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+  line-height: 17px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.need-short {
+  background: var(--tier-1);
+}
+
+.need-weak {
+  background: var(--tier-2);
+}
+
+.need-thin {
+  background: var(--tier-3);
+}
+
+.need-covered {
+  background: var(--tier-4);
+}
+
+.advice-detail {
+  min-width: 0;
+}
+
+.advice-detail h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.advice-detail h4 {
+  margin: 16px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.advice-detail .grid {
+  width: 100%;
+}
+
+.advice-detail .view-note {
+  margin: 0 0 6px;
+}
+
+.advice-grid .value {
+  font-size: 14px;
+}
+
+.advice-attr {
+  max-width: 7.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.advice-main {
+  color: var(--ok);
+  font-size: 10px;
+}
+
+.advice-gain {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.advice-gain.up {
+  color: var(--ok);
+  font-weight: 750;
+}
+
+.advice-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.advice-tag-freeAgent,
+.advice-tag-expiring {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.advice-tag-prospect {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+}
+
+/* How likely a suggested player is to come: green when likely, amber when maybe. */
+.advice-interest {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.interest-likely {
+  background: var(--tier-4);
+}
+
+.interest-maybe {
+  background: var(--tier-2);
+}
+
+.interest-unlikely {
+  background: var(--tier-1);
+}
+
+.advice-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 220px;
+}
+
+.advice-reason {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.advice-reason.pro {
+  color: var(--ok);
+}
+
+.advice-reason.con {
+  color: var(--danger);
+}
+
+.advice-reason.pro::before {
+  content: "+ ";
+}
+
+.advice-reason.con::before {
+  content: "− ";
+}
+
+/* Money in a filter range takes two columns: wide enough for rupiah's long amounts. */
+.filter-fields .filter-money-range {
+  grid-column: span 2;
+}
+
+/* Club Staff tab: the club's staff by department, one table each. */
+.club-staff {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.club-staff-group h3 {
+  margin: 0 0 6px;
+}
+
+.club-staff-group tbody tr {
+  cursor: pointer;
+}
+
+/* The Advisor's suggested signings, local and foreign apart: a small heading over each table. */
+.advice-group {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

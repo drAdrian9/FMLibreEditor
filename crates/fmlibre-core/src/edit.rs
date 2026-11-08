@@ -1211,6 +1211,10 @@ mod tests {
             transfer_listed: false,
             loan_listed: false,
             woman: None,
+            reputation: 0,
+            wage: None,
+            asking_price: None,
+            value: None,
             address: 0,
             shift: 0,
         };

@@ -6,13 +6,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use fmlibre_core::{
-    ArraySource, CaptainRole, CaptainSet, Change, Clause, ClauseSet, ClubDetails, ClubFilter, ClubIndex, ClubMove,
-    Coded, EditError, Entity, EntityArrays, ExportFormat, ExportHeader, FeePlan, Field, FmDate, GAME_EXE, GAME_PLUGIN,
-    GameInfo, GraphicsCounts, GraphicsIndex, HOMEGROWN_RULES, Healed, Health, Kind, Lifted, Listed, Loan, MoveError,
-    MovePlan, MoveTerms, Nation, Operation, Paid, Picture, Planned, PlayerDetails, PlayerFilter, PlayerIndex,
-    PlayerOrder, PlayerSummary, RelationSet, RetirementSet, STAFF_JOBS, SearchIndex, Session, SessionError, Skipped,
-    StaffChange, StaffDetails, StaffFilter, StaffIndex, StaffOrder, StaffPlan, Target, Tie, TieTarget, find_game,
-    nations, sort_players, sort_staff,
+    AdviceOptions, ArraySource, CaptainRole, CaptainSet, Change, Clause, ClauseSet, ClubAdvice, ClubDetails,
+    ClubFilter, ClubIndex, ClubMove, Coded, EditError, Entity, EntityArrays, ExportFormat, ExportHeader, FeePlan,
+    Field, FmDate, GAME_EXE, GAME_PLUGIN, GameInfo, GraphicsCounts, GraphicsIndex, HOMEGROWN_RULES, Healed, Health,
+    INTEREST_POOL, Kind, Lifted, Listed, Loan, MoveError, MovePlan, MoveTerms, Nation, Operation, Paid, Picture,
+    Planned, PlayerDetails, PlayerFilter, PlayerIndex, PlayerOrder, PlayerSummary, RelationSet, RetirementSet,
+    STAFF_JOBS, SearchIndex, Session, SessionError, Severance, Skipped, StaffChange, StaffDetails, StaffFilter,
+    StaffIndex, StaffOrder, StaffPlan, Target, Tie, TieTarget, find_game, nations, sort_players, sort_staff,
 };
 use fmlibre_mem::{Process, find_processes, is_current_process_elevated, list_modules};
 use serde::{Deserialize, Serialize};
@@ -714,15 +714,50 @@ impl Connection {
     /// Logs a member of staff's move, as a change of his `club`, or his new job, as a change of `contract.job`, and
     /// brings his list row up to date.
     fn log_staff(&mut self, done: StaffChange) -> LoggedChange {
+        self.log_staff_paid(done, Vec::new(), None)
+    }
+
+    /// [`Self::log_staff`] for a change the club paid for: a release, which leaves him with no club (`to_club` 0), on
+    /// the terms `ending`.
+    fn log_staff_paid(&mut self, done: StaffChange, paid: Vec<Paid>, ending: Option<Ending>) -> LoggedChange {
+        self.log_staff_full(done, paid, ending, None)
+    }
+
+    /// [`Self::log_staff_paid`], with the member of staff `replaced` a signing took the contract of: he is named in
+    /// the log, his row is left with no club, and an undo gives it back.
+    fn log_staff_full(
+        &mut self,
+        done: StaffChange,
+        paid: Vec<Paid>,
+        ending: Option<Ending>,
+        replaced: Option<u32>,
+    ) -> LoggedChange {
+        let replaced_row = replaced.and_then(|uid| self.staff.get(uid)).map(|s| StaffRow {
+            uid: s.uid,
+            club: s.club.clone(),
+            club_uid: s.club_uid,
+            job: s.job,
+        });
+        let replaced_name = replaced.and_then(|uid| self.staff.get(uid)).map(|s| s.name.clone());
+        if let Some(uid) = replaced {
+            self.staff.update(uid, |member| {
+                member.club = None;
+                member.club_uid = None;
+                member.job = None;
+            });
+        }
         let row = self.staff.get(done.member);
         let (club, club_uid, job) = row.map_or((None, None, None), |s| (s.club.clone(), s.club_uid, s.job));
         let name = row.map_or_else(String::new, |s| s.name.clone());
         let moved = done.from_club != done.to_club;
-        let (from, to) = (self.club_name(done.from_club), self.club_name(done.to_club));
+        let released = done.to_club == 0;
+        // A free agent signed has no club to come from: the window names none.
+        let from = if done.from_club == 0 { String::new() } else { self.club_name(done.from_club) };
+        let to = (!released).then(|| self.club_name(done.to_club));
         self.staff.update(done.member, |member| {
             if moved {
-                member.club = Some(to.clone());
-                member.club_uid = Some(done.to_club);
+                member.club = to.clone();
+                member.club_uid = (!released).then_some(done.to_club);
             }
             member.job = Some(done.job.1);
         });
@@ -738,11 +773,11 @@ impl Connection {
             change: Change { entity: Entity::Staff, uid: done.member, field: field.to_owned(), old, new },
             undone_at: None,
             batch: None,
-            moved: moved.then_some(MovedClubs { from, to: Some(to), with: None, released: None, fee: None }),
+            moved: moved.then_some(MovedClubs { from, to, with: None, released: replaced_name, fee: None, ending }),
             captaincy: None,
             tie: None,
             clause: None,
-            undo: Some(Undo::Staff(LoggedStaff { done, club, club_uid, job })),
+            undo: Some(Undo::Staff(LoggedStaff { done, club, club_uid, job, paid, replaced: replaced_row })),
         };
         self.log.push(logged.clone());
         logged
@@ -863,7 +898,7 @@ impl Connection {
             change,
             undone_at: None,
             batch: None,
-            moved: Some(MovedClubs { from, to: Some(to), with, released, fee }),
+            moved: Some(MovedClubs { from, to: Some(to), with, released, fee, ending: None }),
             captaincy: None,
             tie: None,
             clause: None,
@@ -903,6 +938,7 @@ impl Connection {
                 with: None,
                 released: None,
                 fee: None,
+                ending: None,
             }),
             captaincy: None,
             tie: None,
@@ -947,12 +983,24 @@ impl Connection {
             Some(Undo::Tie(tie)) => self.session.undo_relation(&tie)?,
             Some(Undo::Clause(clause)) => self.session.undo_clause(&clause)?,
             Some(Undo::Staff(logged)) => {
-                self.session.undo_staff_change(&logged.done)?;
+                // What the club paid goes back first; if he cannot go back, it is paid again.
+                self.session.refund_fee(&logged.paid)?;
+                if let Err(err) = self.session.undo_staff_change(&logged.done) {
+                    let _ = self.session.repay_fee(&logged.paid);
+                    return Err(err.into());
+                }
                 self.staff.update(logged.done.member, |member| {
                     member.club = logged.club;
                     member.club_uid = logged.club_uid;
                     member.job = logged.job;
                 });
+                if let Some(row) = logged.replaced {
+                    self.staff.update(row.uid, |member| {
+                        member.club = row.club;
+                        member.club_uid = row.club_uid;
+                        member.job = row.job;
+                    });
+                }
             }
             Some(Undo::Captain(captaincy)) => self.session.undo_captain(&captaincy)?,
             None => {
@@ -1131,6 +1179,47 @@ struct LoggedStaff {
     club: Option<String>,
     club_uid: Option<u32>,
     job: Option<u8>,
+    /// What his club paid to end his contract, for a release.
+    paid: Vec<Paid>,
+    /// For a signing, the row of the member of staff whose contract he took, as it was.
+    replaced: Option<StaffRow>,
+}
+
+/// What a member of staff's list row said about his club and job.
+#[derive(Clone)]
+struct StaffRow {
+    uid: u32,
+    club: Option<String>,
+    club_uid: Option<u32>,
+    job: Option<u8>,
+}
+
+/// How a member of staff's contract was ended.
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum EndingKind {
+    /// The club ends it alone, and pays what is left of it.
+    Terminate,
+    /// He agrees to it, for what the two agree on.
+    Mutual,
+}
+
+/// How a member of staff's contract was ended, and what his club paid him, in pounds.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Ending {
+    kind: EndingKind,
+    paid: i64,
+}
+
+/// What releasing a member of staff comes to: the club he leaves, what is left of his contract, and what the payment
+/// does to the club's balance (none where the game keeps no full finances for it).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StaffReleasePreview {
+    club: ClubName,
+    severance: Severance,
+    balance: Option<fmlibre_core::Amounts>,
 }
 
 /// A tie before and after a change: none before for one added, none after for one taken out.
@@ -1245,6 +1334,9 @@ struct MovedClubs {
     /// The fee the buying club paid the selling one, in pounds, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     fee: Option<i64>,
+    /// For a member of staff released: how his contract was ended, and what he was paid.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ending: Option<Ending>,
 }
 
 /// A move as the log keeps it: the writes to undo, and what the list rows of the players it
@@ -1779,6 +1871,17 @@ fn search_staff(
     ))
 }
 
+/// The staff of the club `club`: everyone whose contract is with it, the human manager too, best current ability first.
+#[tauri::command]
+fn club_staff(state: State<'_, AppState>, club: u32) -> Result<Vec<fmlibre_core::StaffSummary>, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let mut members: Vec<fmlibre_core::StaffSummary> =
+        connection.staff.iter().filter(|member| member.club_uid == Some(club)).cloned().collect();
+    members.sort_by_key(|member| (std::cmp::Reverse(member.current_ability), member.uid));
+    Ok(members)
+}
+
 /// Clubs matching `query`, highest reputation first; at most `limit` rows. `kind_of` keeps to the clubs of the same kind
 /// as the club with that UID, men's or women's: those its players and staff can move to.
 #[tauri::command]
@@ -1917,6 +2020,97 @@ fn staff_details(state: State<'_, AppState>, uid: u32) -> Result<StaffDetails, F
     let connection = guard.as_ref().ok_or_else(not_connected)?;
     let member = connection.staff.get(uid).ok_or_else(|| not_found(Entity::Staff, uid))?;
     connection.session.staff_details(member)?.ok_or_else(data_changed)
+}
+
+/// Advice for the club `club`, or for the one the human manager runs: where its senior squad is short or weak, who
+/// would fill those places, and which staff jobs it would do well to fill. Only reads memory: the club's budgets and
+/// the asking prices of the players suggested.
+#[tauri::command]
+fn club_advice(
+    state: State<'_, AppState>,
+    club: Option<u32>,
+    options: Option<AdviceOptions>,
+) -> Result<ClubAdvice, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let uid = club
+        .or_else(|| connection.human_clubs.first().copied())
+        .ok_or_else(|| Failure::new("advice.noClub", "The save names no club a human manager runs; pick one"))?;
+    let summary = connection.clubs.get(uid).ok_or_else(|| not_found(Entity::Club, uid))?;
+    let options = options.unwrap_or_default();
+    // The players of the team asked for (the senior team unless another is), those out on loan left out; the players
+    // under contract with the club where its teams cannot be read.
+    let teams = connection.session.club_teams(summary, &connection.players).ok().unwrap_or_default();
+    let choices: Vec<fmlibre_core::TeamChoice> = teams
+        .iter()
+        .map(|team| fmlibre_core::TeamChoice {
+            index: team.index,
+            kind: team.kind,
+            age_limit: team.age_limit,
+            players: team.players.iter().filter(|m| m.plays_here && m.loan != Some(Loan::Out)).count(),
+        })
+        // A team with no players (a reserve team the club does not field) has nothing to advise on.
+        .filter(|choice| choice.index == 0 || choice.players > 0)
+        .collect();
+    let picked = teams.iter().find(|team| team.index == options.team).or_else(|| teams.iter().find(|t| t.index == 0));
+    let team_index = picked.map_or(0, |team| team.index);
+    let age_limit = picked.and_then(|team| team.age_limit);
+    let members = picked.map(|team| {
+        team.players
+            .iter()
+            .filter(|member| member.plays_here && member.loan != Some(Loan::Out))
+            .map(|member| member.uid)
+            .collect::<Vec<_>>()
+    });
+    let squad = match members {
+        Some(squad) if !squad.is_empty() => squad,
+        _ if team_index == 0 => connection.players.iter().filter(|p| p.club_uid == Some(uid)).map(|p| p.uid).collect(),
+        _ => Vec::new(),
+    };
+    // More players than are wanted, when those unlikely to come are to be left out: most are.
+    let wide = AdviceOptions {
+        per_role: if options.interested { options.per_role * INTEREST_POOL } else { options.per_role },
+        ..options.clone()
+    };
+    let mut advice = fmlibre_core::advise(
+        summary,
+        &squad,
+        age_limit,
+        &connection.players,
+        &connection.staff,
+        &connection.clubs,
+        &connection.human_clubs,
+        connection.session.game_date(),
+        &wide,
+    );
+    advice.finances = connection.session.club_details(summary).ok().flatten().and_then(|details| details.finances);
+    advice.team = team_index;
+    advice.teams = choices;
+    // Each player's profile: his asking price, and what bears on whether he would come.
+    fmlibre_core::refine(&mut advice, |player| connection.session.player_details(player).ok().flatten(), &options);
+    Ok(advice)
+}
+
+/// The country the club the human manager runs plays in, by name, as far as its squad tells (see `home_nation`): the
+/// app shows money in its currency unless the user chose another. None when the save names no such club.
+#[tauri::command]
+fn human_club_nation(state: State<'_, AppState>) -> Result<Option<String>, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let Some(&uid) = connection.human_clubs.first() else {
+        return Ok(None);
+    };
+    let squad: Vec<&PlayerSummary> = connection.players.iter().filter(|p| p.club_uid == Some(uid)).collect();
+    let nation = fmlibre_core::home_nation(&squad);
+    Ok(nation.and_then(|nation| squad.iter().find(|p| p.nation_uid == Some(nation))?.nation.clone()))
+}
+
+/// The clubs human managers run in this save, for the advice's choice of club.
+#[tauri::command]
+fn human_clubs(state: State<'_, AppState>) -> Result<Vec<u32>, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    Ok(connection.human_clubs.clone())
 }
 
 /// The nations of the players and staff in the lists, by name: what a nation field can be set to.
@@ -2292,6 +2486,83 @@ fn move_staff(state: State<'_, AppState>, uid: u32, club: u32) -> Result<LoggedC
     let plan = connection.plan_staff_move(uid, club)?;
     let done = connection.session.apply_staff_plan(&plan)?;
     Ok(connection.log_staff(done))
+}
+
+/// Works out releasing the member of staff `uid` from his club, and what paying `amount` (what is left of his
+/// contract, when not given) does to its balance; the error says why he cannot be released. Nothing is written.
+#[tauri::command]
+fn plan_staff_release(
+    state: State<'_, AppState>,
+    uid: u32,
+    amount: Option<i64>,
+) -> Result<StaffReleasePreview, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let member = connection.staff.get(uid).ok_or_else(|| not_found(Entity::Staff, uid))?;
+    let (plan, severance) = connection.session.plan_staff_release(member)?;
+    let club = connection.clubs.get(plan.from_club).ok_or_else(|| not_found(Entity::Club, plan.from_club))?;
+    let balance = connection.session.plan_payment(club, amount.unwrap_or(severance.remaining))?;
+    Ok(StaffReleasePreview { club: ClubName { uid: club.uid, name: club.name.clone() }, severance, balance })
+}
+
+/// Releases the member of staff `uid` from his club, which ends his contract: on `terminate` the club pays what is
+/// left of it, on `mutual` the `amount` the two agree on (none when not given). Worked out again from the game as it
+/// is now, and logged; when the club cannot pay, he is not released.
+#[tauri::command]
+fn release_staff(
+    state: State<'_, AppState>,
+    uid: u32,
+    kind: EndingKind,
+    amount: Option<i64>,
+) -> Result<LoggedChange, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    let member = connection.staff.get(uid).ok_or_else(|| not_found(Entity::Staff, uid))?;
+    let (plan, severance) = connection.session.plan_staff_release(member)?;
+    let club = connection.clubs.get(plan.from_club).cloned().ok_or_else(|| not_found(Entity::Club, plan.from_club))?;
+    let paid_out = match kind {
+        EndingKind::Terminate => severance.remaining,
+        EndingKind::Mutual => amount.unwrap_or(0),
+    };
+    let balance = connection.session.plan_payment(&club, paid_out)?;
+    let done = connection.session.apply_staff_plan(&plan)?;
+    let paid = match balance {
+        Some(amounts) => match connection.session.pay(&club, amounts) {
+            Ok(paid) => paid,
+            Err(err) => {
+                let _ = connection.session.undo_staff_change(&done);
+                return Err(err.into());
+            }
+        },
+        None => Vec::new(),
+    };
+    Ok(connection.log_staff_paid(done, paid, Some(Ending { kind, paid: paid_out })))
+}
+
+/// Checks that the member of staff `uid`, who has no club, can be signed in the place of `replaced`, and names the
+/// club; the error says why he cannot. Nothing is written.
+#[tauri::command]
+fn plan_staff_sign(state: State<'_, AppState>, uid: u32, replaced: u32) -> Result<ClubName, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let free = connection.staff.get(uid).ok_or_else(|| not_found(Entity::Staff, uid))?;
+    let out = connection.staff.get(replaced).ok_or_else(|| not_found(Entity::Staff, replaced))?;
+    let plan = connection.session.plan_staff_sign(free, out)?;
+    Ok(ClubName { uid: plan.to_club, name: connection.club_name(plan.to_club) })
+}
+
+/// Signs the member of staff `uid`, who has no club, in the place of `replaced`: he takes over that contract and its
+/// place in the club's departments, and `replaced` is left with none. Worked out again from the game as it is now, and
+/// logged; one undo puts both back.
+#[tauri::command]
+fn sign_staff(state: State<'_, AppState>, uid: u32, replaced: u32) -> Result<LoggedChange, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    let free = connection.staff.get(uid).ok_or_else(|| not_found(Entity::Staff, uid))?;
+    let out = connection.staff.get(replaced).ok_or_else(|| not_found(Entity::Staff, replaced))?;
+    let plan = connection.session.plan_staff_sign(free, out)?;
+    let done = connection.session.apply_staff_plan(&plan)?;
+    Ok(connection.log_staff_full(done, Vec::new(), None, Some(replaced)))
 }
 
 /// Gives the member of staff `uid` the job `job` (a contract code) at his club, and logs it.
@@ -2836,6 +3107,11 @@ pub fn run() {
             swap_players,
             plan_staff_move,
             move_staff,
+            plan_staff_release,
+            club_staff,
+            plan_staff_sign,
+            sign_staff,
+            release_staff,
             change_staff_job,
             staff_jobs,
             heal_player,
@@ -2849,6 +3125,9 @@ pub fn run() {
             add_release_clause,
             homegrown_rules,
             club_squads,
+            club_advice,
+            human_clubs,
+            human_club_nation,
             set_captain,
             team_action,
             max_attributes,

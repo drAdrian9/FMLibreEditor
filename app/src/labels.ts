@@ -138,6 +138,8 @@ export const editText = strings.edit;
 /** The Changes view: what was written to the game this session. */
 export const changesText = strings.changes;
 
+export const adviceText = strings.advice;
+
 /** Mass editing: the button in the toolbar of a list and the dialog it opens. */
 export const massEditText = strings.massEdit;
 
@@ -152,6 +154,12 @@ export const moveText = strings.move;
 
 /** Releasing a player from his club: the button beside Transfer in his profile and the dialog it opens. */
 export const releaseText = strings.release;
+
+/** Releasing a member of staff: the button in his profile and its dialog. */
+export const staffReleaseText = strings.staffRelease;
+
+/** Signing a member of staff without a club in the place of one of your club's. */
+export const staffSignText = strings.staffSign;
 
 /** A player's secondary nationalities and homegrown status: the group in his profile and its dialog. */
 export const tieText = strings.ties;

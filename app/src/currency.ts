@@ -18,14 +18,48 @@ const RATES = {
   BRL: 7.36309385,
   ARS: 1644.82361,
   MXN: 25.3028679,
+  // Worked out from what the game shows in rupiah against the pounds it keeps: Persija's transfer budget of
+  // £953,781 is Rp 22,795,243,724, and its wage budget of £51,131 a week Rp 63,545,244,854 a year (7 November 2026).
+  IDR: 23899.8719,
 } as const;
+
+/** The currency of the country a club plays in, by the nation's name as the game spells it; pounds elsewhere. */
+const NATION_CURRENCIES: Record<string, Currency> = {
+  Indonesia: "IDR",
+  England: "GBP",
+  Scotland: "GBP",
+  Wales: "GBP",
+  "Northern Ireland": "GBP",
+  Spain: "EUR",
+  Italy: "EUR",
+  Germany: "EUR",
+  France: "EUR",
+  Portugal: "EUR",
+  Netherlands: "EUR",
+  Belgium: "EUR",
+  Austria: "EUR",
+  "Republic of Ireland": "EUR",
+  Greece: "EUR",
+  Finland: "EUR",
+  Croatia: "EUR",
+  Slovakia: "EUR",
+  Slovenia: "EUR",
+  "United States": "USD",
+  USA: "USD",
+  Türkiye: "TRY",
+  Turkey: "TRY",
+  Brazil: "BRL",
+  Argentina: "ARS",
+  Mexico: "MXN",
+};
 
 export type Currency = keyof typeof RATES;
 
 export const CURRENCIES = Object.keys(RATES) as Currency[];
 
-/** Where the chosen currency is kept. */
+/** Where the chosen currency is kept, and whether the app chose it, after the save, rather than the user. */
 const STORAGE_KEY = "fmlibre.currency";
+const AUTO_KEY = "fmlibre.currency.auto";
 
 function isCurrency(value: string | null): value is Currency {
   return value !== null && Object.prototype.hasOwnProperty.call(RATES, value);
@@ -63,14 +97,34 @@ export const toPounds = (shown: number): number => Math.round(shown / rate);
 
 /**
  * Makes `next` the currency and reloads the window to apply it, as a new language is (see `setLocale`): the choice is
- * saved first, and what the window shows too; when the choice cannot be saved, the window is left alone.
+ * saved first, and what the window shows too; when the choice cannot be saved, the window is left alone. `auto` when
+ * the app chose it after the save (see `currencyForSave`): a later save of another country may change it again, a
+ * choice of the user's may not.
  */
-export function setCurrency(next: Currency): void {
+export function setCurrency(next: Currency, auto = false): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, next);
+    window.localStorage.setItem(AUTO_KEY, auto ? "1" : "0");
   } catch {
     return;
   }
   saveSnapshot();
   window.location.reload();
+}
+
+/**
+ * Shows money in the currency of the country the managed club plays in, `nation`, unless the user chose a currency of
+ * their own: the window reloads once to apply it, and the app keeps its connection through that.
+ */
+export function currencyForSave(nation: string | null): void {
+  let chosenByUser = false;
+  try {
+    chosenByUser = window.localStorage.getItem(STORAGE_KEY) !== null && window.localStorage.getItem(AUTO_KEY) !== "1";
+  } catch {
+    return;
+  }
+  const next = nation ? NATION_CURRENCIES[nation] : undefined;
+  if (!chosenByUser && next && next !== currency) {
+    setCurrency(next, true);
+  }
 }
