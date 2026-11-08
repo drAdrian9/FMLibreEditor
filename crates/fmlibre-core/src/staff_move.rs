@@ -382,6 +382,22 @@ impl Session {
         job: u8,
         terms: MoveTerms,
     ) -> Result<StaffPlan, MoveError> {
+        self.plan_staff_signing_for(member, club, job, terms, 0)
+    }
+
+    /// [`Session::plan_staff_signing`] for the club's team `team` (its place in the club's list of teams; 0 is the
+    /// senior team): an academy's staff, the under-21s' or the under-18s' coach or sports scientist, are in the
+    /// club's departments as the senior team's are, and only their contract tells them apart, by naming that team
+    /// as their employer (Persija's under-21s fitness coach and under-18s coach, Steam build, 8 November 2026). A
+    /// director of football and a manager work for the senior team only.
+    pub fn plan_staff_signing_for(
+        &self,
+        member: &StaffSummary,
+        club: &ClubSummary,
+        job: u8,
+        terms: MoveTerms,
+        team: usize,
+    ) -> Result<StaffPlan, MoveError> {
         let (process, layout) = (&self.process, &self.layout);
         let s = &layout.staff;
         let (Some(size), Some(pools)) = (layout.contract.size, layout.pool.as_ref()) else {
@@ -405,6 +421,20 @@ impl Session {
         }
         let senior = self.joining_club(club, None)?;
         let post = self.post(job)?;
+        let employer = if team == 0 {
+            senior
+        } else {
+            if !matches!(post, Post::Department(_)) {
+                return Err(MoveError::NoTeam { index: team });
+            }
+            let teams = PointerList::read(process, club.address + layout.club.teams)?
+                .ok_or(MoveError::NoTeam { index: team })?;
+            let found = teams.elements(process)?.get(team).copied().unwrap_or(0);
+            if !is_user_pointer(found) || process.read_u64(found + layout.team.club)? != club.address {
+                return Err(MoveError::NoTeam { index: team });
+            }
+            found
+        };
         // Where he joins first: a club's place for a director of football that is taken refuses him before the pool
         // is looked at.
         let (mut joining, mut grow) = (Patches::default(), Vec::new());
@@ -414,7 +444,7 @@ impl Session {
         let pool = self.pool_holding(model, size)?;
         let taken = pool.take(process, pools)?;
         let model = process.read_bytes(model, size as usize)?;
-        let contract = self.new_staff_contract(model, object, senior, job, terms, today);
+        let contract = self.new_staff_contract(model, object, employer, senior, job, terms, today);
         let c = &layout.contract;
         let field = |offset: u64, kind: Kind| kind.decode(&contract[offset as usize..offset as usize + 4]);
         let made = NewStaffContract { wage: field(c.wage, Kind::I32), expires: field(c.expires, Kind::Date) };
@@ -851,10 +881,12 @@ impl Session {
 
     /// The bytes of a new contract for the member of staff `object` with the senior team `senior` as `job`, on
     /// `terms`, made from `model`'s (see [`Session::plan_staff_signing`]).
+    #[allow(clippy::too_many_arguments)]
     fn new_staff_contract(
         &self,
         model: Vec<u8>,
         object: u64,
+        employer: u64,
         senior: u64,
         job: u8,
         terms: MoveTerms,
@@ -865,7 +897,7 @@ impl Session {
         let mut bytes = model.clone();
         let mut put = |offset: u64, value: &[u8]| bytes[at(offset, value.len())].copy_from_slice(value);
         put(c.owner, &(object + s.identity()).to_le_bytes());
-        put(c.team, &senior.to_le_bytes());
+        put(c.team, &employer.to_le_bytes());
         put(c.senior_team, &senior.to_le_bytes());
         put(c.job, &[job]);
         // The dates keep the flags the model's have.

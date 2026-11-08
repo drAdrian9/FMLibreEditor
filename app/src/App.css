@@ -4937,19 +4937,6 @@ button.danger:hover:not(:disabled) {
   gap: 4px;
   min-width: 0;
   margin-bottom: 10px;
-
-/* Advisor */
-
-/* The view scrolls as a whole: the summary, the list of places and the tables of the one picked. */
-.players.advice {
-  overflow: auto;
-  padding-bottom: 18px;
-}
-
-.advice-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -5108,57 +5095,6 @@ button.danger:hover:not(:disabled) {
 }
 
 .scout-own ul {
-
-.advice-option.check {
-  cursor: pointer;
-}
-
-.advice-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 22px;
-  margin: 4px 0 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--raised);
-  font-variant-numeric: tabular-nums;
-}
-
-.advice-summary small {
-  margin-right: 4px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.advice-tabs {
-  margin-bottom: 12px;
-  padding: 0;
-}
-
-/* The places (or jobs) on the left, the one picked on the right; one above the other in a narrow window. */
-.advice-body {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.advice-body.stale {
-  opacity: 0.6;
-}
-
-@media (max-width: 900px) {
-  .advice-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.advice-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -5185,98 +5121,6 @@ button.danger:hover:not(:disabled) {
   font-size: 10.5px;
   font-stretch: 88%;
   font-weight: 800;
-
-.advice-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--field);
-  color: var(--text);
-  text-align: left;
-}
-
-.advice-item:hover {
-  border-color: var(--border-strong);
-  background: var(--hover);
-}
-
-.advice-item.picked {
-  border-color: var(--accent);
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-
-.advice-item-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.advice-item-name {
-  font-weight: 750;
-}
-
-.advice-item-sub,
-.advice-item-facts {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.advice-item-facts {
-  display: flex;
-  gap: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* How badly a place wants someone, on FM's bands: short is the worst band, covered the best. */
-.need {
-  padding: 0 6px;
-  border-radius: 2px;
-  color: var(--on-tier);
-  font-size: 10.5px;
-  font-weight: 750;
-  letter-spacing: 0.3px;
-  line-height: 17px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.need-short {
-  background: var(--tier-1);
-}
-
-.need-weak {
-  background: var(--tier-2);
-}
-
-.need-thin {
-  background: var(--tier-3);
-}
-
-.need-covered {
-  background: var(--tier-4);
-}
-
-.advice-detail {
-  min-width: 0;
-}
-
-.advice-detail h3 {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 6px;
-  font-size: 18px;
-}
-
-.advice-detail h4 {
-  margin: 16px 0 6px;
-  color: var(--muted);
-  font-size: 12px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
 }
@@ -5843,6 +5687,172 @@ button.danger:hover:not(:disabled) {
 .stadium-name-input {
   flex: 1;
   min-width: 0;
+}
+
+/* Advisor */
+
+/* The view scrolls as a whole: the summary, the list of places and the tables of the one picked. */
+.players.advice {
+  overflow: auto;
+  padding-bottom: 18px;
+}
+
+.advice-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.advice-option.check {
+  cursor: pointer;
+}
+
+.advice-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 22px;
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-variant-numeric: tabular-nums;
+}
+
+.advice-summary small {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advice-tabs {
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+/* The places (or jobs) on the left, the one picked on the right; one above the other in a narrow window. */
+.advice-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.advice-body.stale {
+  opacity: 0.6;
+}
+
+@media (max-width: 900px) {
+  .advice-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.advice-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--field);
+  color: var(--text);
+  text-align: left;
+}
+
+.advice-item:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+
+.advice-item.picked {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.advice-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.advice-item-name {
+  font-weight: 750;
+}
+
+.advice-item-sub,
+.advice-item-facts {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advice-item-facts {
+  display: flex;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* How badly a place wants someone, on FM's bands: short is the worst band, covered the best. */
+.need {
+  padding: 0 6px;
+  border-radius: 2px;
+  color: var(--on-tier);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+  line-height: 17px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.need-short {
+  background: var(--tier-1);
+}
+
+.need-weak {
+  background: var(--tier-2);
+}
+
+.need-thin {
+  background: var(--tier-3);
+}
+
+.need-covered {
+  background: var(--tier-4);
+}
+
+.advice-detail {
+  min-width: 0;
+}
+
+.advice-detail h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.advice-detail h4 {
+  margin: 16px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 .advice-detail .grid {

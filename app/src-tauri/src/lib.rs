@@ -1060,11 +1060,20 @@ impl Connection {
 
     /// Works out moving the member of staff `uid` to the club `club`, as `job` if given, or else in his own job; one
     /// who has no club is signed for it, as `job`, on a contract the editor makes on `terms`.
-    fn plan_staff_move(&self, uid: u32, club: u32, job: Option<u8>, terms: MoveTerms) -> Result<StaffPlan, Failure> {
+    fn plan_staff_move(
+        &self,
+        uid: u32,
+        club: u32,
+        job: Option<u8>,
+        terms: MoveTerms,
+        team: usize,
+    ) -> Result<StaffPlan, Failure> {
         let member = self.staff.get(uid).ok_or_else(|| not_found(Entity::Staff, uid))?;
         let to = self.clubs.get(club).ok_or_else(|| not_found(Entity::Club, club))?;
         let planned = match member.club_uid {
-            None => job.ok_or(MoveError::NoJob).and_then(|job| self.session.plan_staff_signing(member, to, job, terms)),
+            None => job
+                .ok_or(MoveError::NoJob)
+                .and_then(|job| self.session.plan_staff_signing_for(member, to, job, terms, team)),
             Some(_) => self.session.plan_staff_move(member, to, job),
         };
         planned.map_err(|err| self.with_names(err.into()))
@@ -3112,10 +3121,11 @@ fn plan_staff_move(
     club: u32,
     job: Option<u8>,
     terms: Option<MoveTerms>,
+    team: Option<usize>,
 ) -> Result<MovePreview, Failure> {
     let guard = state.0.lock()?;
     let connection = guard.as_ref().ok_or_else(not_connected)?;
-    let plan = connection.plan_staff_move(uid, club, job, terms.unwrap_or_default())?;
+    let plan = connection.plan_staff_move(uid, club, job, terms.unwrap_or_default(), team.unwrap_or(0))?;
     let name = |uid: u32| ClubName { uid, name: connection.club_name(uid) };
     let from = (plan.from_club != 0).then(|| name(plan.from_club));
     Ok(MovePreview { from, to: name(plan.to_club), fee: None, contract: None, staff_contract: plan.contract })
@@ -3130,10 +3140,11 @@ fn move_staff(
     club: u32,
     job: Option<u8>,
     terms: Option<MoveTerms>,
+    team: Option<usize>,
 ) -> Result<LoggedChange, Failure> {
     let mut guard = state.0.lock()?;
     let connection = guard.as_mut().ok_or_else(not_connected)?;
-    let plan = connection.plan_staff_move(uid, club, job, terms.unwrap_or_default())?;
+    let plan = connection.plan_staff_move(uid, club, job, terms.unwrap_or_default(), team.unwrap_or(0))?;
     let done = connection.session.apply_staff_plan(&plan)?;
     Ok(connection.log_staff(done, plan.contract))
 }

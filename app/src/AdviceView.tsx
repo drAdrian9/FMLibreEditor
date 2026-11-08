@@ -275,7 +275,16 @@ function Summary({ advice }: { advice: ClubAdvice }) {
         <strong>{club.name}</strong>
       </WithPicture>
       <span>
-        <small>{text.summary.squad}</small> {advice.squadSize}
+        <small>
+          {advice.team === 0
+            ? text.summary.squad
+            : teamLabel({
+                index: advice.team,
+                kind: advice.teams.find((t) => t.index === advice.team)?.kind,
+                ageLimit: advice.teams.find((t) => t.index === advice.team)?.ageLimit,
+              })}
+        </small>{" "}
+        {advice.squadSize}
       </span>
       {advice.averageAge !== null && (
         <span>

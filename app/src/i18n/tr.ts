@@ -1733,6 +1733,8 @@ export const tr: Strings = {
     staffContract: "Görevi, maaşı ve sözleşme bitişi aynı kalır; sözleşme oyundaki tarihle başlar.",
     staffJob: "Görev",
     staffJobChoose: "Görev seçin…",
+    staffTeam: "Takım",
+    staffTeamHint: "Akademi personeli (U21, U18) o takım için çalışır; teknik direktör ve futbol direktörü yalnızca A takımı için.",
     staffJobKept: (job) => `${job} (aynı kalır)`,
     staffNewJob: "Yeni görevi alır; maaşı ve sözleşme bitişi aynı kalır, sözleşme oyundaki tarihle başlar.",
     staffDoes: [

@@ -315,15 +315,15 @@ export const homegrownRules = () => call<number[]>("homegrown_rules");
  * names the clubs; the error says why he cannot. One who has no club is signed, as `job`, on a contract the app makes
  * on `terms`, which the answer says (`MovePreview.staffContract`).
  */
-export const planStaffMove = (uid: number, club: number, job?: number, terms?: MoveTerms) =>
-  call<MovePreview>("plan_staff_move", { uid, club, job, terms });
+export const planStaffMove = (uid: number, club: number, job?: number, terms?: MoveTerms, team?: number) =>
+  call<MovePreview>("plan_staff_move", { uid, club, job, terms, team });
 
 /**
  * Moves the member of staff to the club, as `job` if given (else in the departments he works in), or signs one who has
  * no club as `job` on `terms`; logged and undone like any change.
  */
-export const moveStaff = (uid: number, club: number, job?: number, terms?: MoveTerms) =>
-  call<LoggedChange>("move_staff", { uid, club, job, terms });
+export const moveStaff = (uid: number, club: number, job?: number, terms?: MoveTerms, team?: number) =>
+  call<LoggedChange>("move_staff", { uid, club, job, terms, team });
 
 /** Gives the member of staff another job at his club (a contract code); logged and undone like any change. */
 export const changeStaffJob = (uid: number, job: number) => call<LoggedChange>("change_staff_job", { uid, job });
