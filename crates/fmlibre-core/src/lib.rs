@@ -44,8 +44,9 @@ mod text;
 mod transfer;
 
 pub use advice::{
-    AdviceOptions, Candidate, ClubAdvice, Disposition, FORMATIONS, INTEREST_POOL, Interest, Need, RoleAdvice,
-    RoleMember, StaffAdvice, StaffPick, Tag, TeamChoice, XiPick, advise, best_eleven, home_nation, judge, refine,
+    AdviceOptions, Candidate, ClubAdvice, Disposition, FORMATIONS, INTEREST_POOL, Interest, JADED, LOW_MORALE, Need,
+    Readiness, RoleAdvice, RoleMember, StaffAdvice, StaffPick, TIRED, Tag, TeamChoice, UNSHARP, XiPick, advise,
+    best_eleven, home_nation, judge, refine,
 };
 pub use calibrate::{ArrayRef, EntityArrays, calibrate};
 pub use clauses::{

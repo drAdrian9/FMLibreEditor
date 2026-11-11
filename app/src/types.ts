@@ -1254,6 +1254,25 @@ export interface AdviceOptions {
   team?: number;
   /** The formation of the suggested eleven, e.g. "4-3-3". */
   formation?: string;
+  /** Draw the eleven in the formation of the manager's own tactic, where it can be read. */
+  useTactic?: boolean;
+}
+
+/** A player of the team who is not fully ready, and why (see `club_advice`). */
+export interface Readiness {
+  player: PlayerSummary;
+  injuries: Injury[];
+  bans: Ban[];
+  /** 0–10000 (100.00%). */
+  condition: number;
+  matchSharpness: number;
+  /** -500 rested; higher is more worn out. */
+  jadedness: number;
+  /** 1–20. */
+  morale: number;
+  happiness: number | null;
+  /** How many of his reasons to be unhappy last. */
+  concerns: number;
 }
 
 /** One place of the suggested eleven: the position it is played in, and who plays it (none where no one is left). */
@@ -1366,5 +1385,10 @@ export interface ClubAdvice {
   /** The formation of the suggested eleven, and the eleven, from the goalkeeper up. */
   formation: string;
   eleven: XiPick[];
+  /** Whether the eleven was drawn in the manager's own tactic, and its style as the game codes it ("CONT"...). */
+  ownTactic: boolean;
+  tacticStyle: string | null;
+  /** The players not fully ready: injured, banned, tired, unsharp, jaded, low in morale or unhappy. */
+  readiness: Readiness[];
   staff: StaffAdvice[];
 }

@@ -16,6 +16,7 @@ import type {
   AdviceTag,
   Candidate,
   ClubAdvice,
+  Readiness,
   ClubPage,
   Need,
   PlayerSummary,
@@ -25,7 +26,7 @@ import type {
   StaffSummary,
 } from "./types";
 
-type Section = "squad" | "eleven" | "staff";
+type Section = "squad" | "eleven" | "readiness" | "staff";
 
 /** The formations the suggested eleven can be drawn in (see `FORMATIONS` in advice.rs). */
 const FORMATIONS = ["4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "4-4-1-1", "3-5-2", "3-4-3", "5-3-2"];
@@ -59,6 +60,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
   const [club, setClub] = useState<number | null>(null);
   const [team, setTeam] = useState(0);
   const [formation, setFormation] = useState(FORMATIONS[0]);
+  const [useTactic, setUseTactic] = useState(false);
   const [maxAge, setMaxAge] = useState(32);
   const [realistic, setRealistic] = useState(true);
   const [interested, setInterested] = useState(true);
@@ -100,13 +102,13 @@ export function AdviceView({ version, active }: { version: number; active: boole
   }, [version]);
 
   useEffect(() => {
-    const key = JSON.stringify([version, club, team, formation, maxAge, realistic, interested, again]);
+    const key = JSON.stringify([version, club, team, formation, useTactic, maxAge, realistic, interested, again]);
     if (!active || drawn.current === key) {
       return;
     }
     drawn.current = key;
     const mine = ++asked.current;
-    const options: AdviceOptions = { maxAge, realistic, interested, perRole: PER_ROLE, team, formation };
+    const options: AdviceOptions = { maxAge, realistic, interested, perRole: PER_ROLE, team, formation, useTactic };
     setBusy(true);
     setError(null);
     call<ClubAdvice>("club_advice", { club, options })
@@ -129,7 +131,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
           setBusy(false);
         }
       });
-  }, [active, version, club, team, formation, maxAge, realistic, interested, again]);
+  }, [active, version, club, team, formation, useTactic, maxAge, realistic, interested, again]);
 
   const shownRole = advice?.roles.find((r) => r.key === role) ?? null;
   const shownJob = advice?.staff.find((s) => s.key === job) ?? null;
@@ -202,7 +204,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
           <>
             <Summary advice={advice} />
             <div className="profile-tabs advice-tabs" role="tablist">
-              {(["squad", "eleven", "staff"] as const).map((id) => (
+              {(["squad", "eleven", "readiness", "staff"] as const).map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -221,8 +223,12 @@ export function AdviceView({ version, active }: { version: number; active: boole
                   advice={advice}
                   formation={formation}
                   onFormation={setFormation}
+                  useTactic={useTactic}
+                  onUseTactic={setUseTactic}
                   onOpen={setShownPlayer}
                 />
+              ) : section === "readiness" ? (
+                <ReadinessList rows={advice.readiness} onOpen={setShownPlayer} />
               ) : section === "squad" ? (
                 <>
                   <ul className="advice-list">
@@ -650,11 +656,15 @@ function Eleven({
   advice,
   formation,
   onFormation,
+  useTactic,
+  onUseTactic,
   onOpen,
 }: {
   advice: ClubAdvice;
   formation: string;
   onFormation: (formation: string) => void;
+  useTactic: boolean;
+  onUseTactic: (on: boolean) => void;
   onOpen: (player: PlayerSummary) => void;
 }) {
   const picks = advice.eleven.map((pick, index) => ({ ...pick, index }));
@@ -666,7 +676,7 @@ function Eleven({
       <div className="advice-eleven-head">
         <label className="advice-option">
           {text.eleven.formation}
-          <select value={formation} onChange={(e) => onFormation(e.target.value)}>
+          <select value={formation} disabled={advice.ownTactic} onChange={(e) => onFormation(e.target.value)}>
             {FORMATIONS.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -674,8 +684,27 @@ function Eleven({
             ))}
           </select>
         </label>
+        <label className="advice-option check" title={text.eleven.useTacticTitle}>
+          <input type="checkbox" checked={useTactic} onChange={(e) => onUseTactic(e.target.checked)} />
+          {text.eleven.useTactic}
+        </label>
         {average !== null && <span className="muted">{text.eleven.average(average)}</span>}
       </div>
+      {useTactic && (
+        <p className={advice.ownTactic ? "view-note" : "view-note error"}>
+          {advice.ownTactic ? text.eleven.ownTactic(advice.tacticStyle) : text.eleven.noTactic}
+        </p>
+      )}
+      {advice.readiness.some((r) => r.injuries.length > 0 || r.bans.length > 0) && (
+        <p className="view-note">
+          {text.eleven.leftOut(
+            advice.readiness
+              .filter((r) => r.injuries.length > 0 || r.bans.length > 0)
+              .map((r) => r.player.name)
+              .join(", "),
+          )}
+        </p>
+      )}
       <p className="view-note">{text.eleven.note}</p>
       <div className="eleven-pitch">
         {lines.map((line) => (
@@ -707,6 +736,77 @@ function Eleven({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** What keeps a player from being fully ready, as short labelled chips: worst first. */
+function readinessChips(row: Readiness): { label: string; tone: "bad" | "warn" }[] {
+  const r = text.readiness;
+  const chips: { label: string; tone: "bad" | "warn" }[] = [];
+  for (const injury of row.injuries) {
+    const back = injury.backSoonest ? formatDate(injury.backSoonest) : null;
+    chips.push({ label: r.injured(injury.name ?? r.injury, back), tone: "bad" });
+  }
+  for (const ban of row.bans) {
+    chips.push({ label: r.banned(ban.matches), tone: "bad" });
+  }
+  if (row.condition < 8500) chips.push({ label: r.tired(Math.round(row.condition / 100)), tone: "warn" });
+  if (row.matchSharpness < 6000) chips.push({ label: r.unsharp(Math.round(row.matchSharpness / 100)), tone: "warn" });
+  if (row.jadedness > 250) chips.push({ label: r.jaded, tone: "warn" });
+  if (row.morale <= 8) chips.push({ label: r.lowMorale(row.morale), tone: "warn" });
+  if (row.concerns > 0) chips.push({ label: r.concerns(row.concerns), tone: "warn" });
+  else if (row.happiness !== null && row.happiness < 0) chips.push({ label: r.unhappy, tone: "warn" });
+  return chips;
+}
+
+/** The players of the team who are not fully ready, the injured and banned first; a name opens the profile. */
+function ReadinessList({ rows, onOpen }: { rows: Readiness[]; onOpen: (player: PlayerSummary) => void }) {
+  const r = text.readiness;
+  return (
+    <div className="advice-readiness">
+      <p className="view-note">{r.note}</p>
+      {rows.length === 0 ? (
+        <p className="muted">{r.allReady}</p>
+      ) : (
+        <table className="grid advice-grid">
+          <thead>
+            <tr>
+              <th>{text.columns.name}</th>
+              <th>{text.columns.positions}</th>
+              <th className="num">{text.columns.ca}</th>
+              <th>{r.why}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.player.uid}
+                tabIndex={0}
+                onClick={() => onOpen(row.player)}
+                onKeyDown={openOnKey(() => onOpen(row.player))}
+              >
+                <td className="col-name">
+                  <div className="name">{row.player.name}</div>
+                </td>
+                <td className="col-positions">{row.player.positions.slice(0, 3).map(positionLabel).join(" ")}</td>
+                <td className="num">
+                  <Ability value={row.player.currentAbility} />
+                </td>
+                <td>
+                  <span className="readiness-chips">
+                    {readinessChips(row).map((chip) => (
+                      <span key={chip.label} className={`readiness-chip ${chip.tone}`}>
+                        {chip.label}
+                      </span>
+                    ))}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

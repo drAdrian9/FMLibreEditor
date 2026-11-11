@@ -6127,3 +6127,35 @@ button.danger:hover:not(:disabled) {
   gap: 10px;
   font-size: 13px;
 }
+
+/* The Advisor's readiness list: why each player is not fully ready, as chips. */
+.advice-readiness {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.readiness-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.readiness-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.readiness-chip.bad {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.readiness-chip.warn {
+  border-color: var(--pending);
+  color: var(--pending);
+}

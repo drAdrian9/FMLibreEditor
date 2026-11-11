@@ -82,11 +82,21 @@ pub struct AdviceOptions {
     pub team: usize,
     /// The formation of the suggested eleven (see [`FORMATIONS`]); the first one when it names none.
     pub formation: Option<String>,
+    /// Draw the eleven in the formation of the tactic the club's manager plays, where it can be read.
+    pub use_tactic: bool,
 }
 
 impl Default for AdviceOptions {
     fn default() -> Self {
-        Self { max_age: 32, realistic: true, per_role: 10, interested: true, team: 0, formation: None }
+        Self {
+            max_age: 32,
+            realistic: true,
+            per_role: 10,
+            interested: true,
+            team: 0,
+            formation: None,
+            use_tactic: false,
+        }
     }
 }
 
@@ -142,6 +152,12 @@ pub struct ClubAdvice {
     /// The formation of the suggested eleven, and the eleven: the best player of the team for each place.
     pub formation: &'static str,
     pub eleven: Vec<XiPick>,
+    /// Whether the eleven was drawn in the manager's own tactic, and its style as the game codes it (`CONT`...).
+    pub own_tactic: bool,
+    pub tactic_style: Option<String>,
+    /// The players of the team who are not fit to play, or not happy: injured, banned, tired, short of match
+    /// sharpness, low in morale or with reasons to be unhappy. The app fills it in.
+    pub readiness: Vec<Readiness>,
     pub staff: Vec<StaffAdvice>,
 }
 
@@ -240,6 +256,31 @@ pub fn best_eleven(members: &[&PlayerSummary], formation: &[&'static str; 11]) -
         })
         .collect()
 }
+
+/// A player of the team who is not fully ready, and why. The injured and the banned are left out of the eleven.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Readiness {
+    pub player: PlayerSummary,
+    /// His current injuries and bans.
+    pub injuries: Vec<crate::Injury>,
+    pub bans: Vec<crate::Ban>,
+    /// Energy and match sharpness, 0–10000 (100.00%); jadedness, -500 rested and higher more worn out; morale 1–20.
+    pub condition: u16,
+    pub match_sharpness: u16,
+    pub jadedness: i16,
+    pub morale: u8,
+    /// His happiness with his contract, as the game keeps it; and how many reasons to be unhappy last.
+    pub happiness: Option<i8>,
+    pub concerns: usize,
+}
+
+/// Energy below this (85%) counts as tired, match sharpness below this (60%) as short of it, jadedness above this
+/// as jaded, and morale at or below this (of 20) as low.
+pub const TIRED: u16 = 8_500;
+pub const UNSHARP: u16 = 6_000;
+pub const JADED: i16 = 250;
+pub const LOW_MORALE: u8 = 8;
 
 /// One of a club's teams the advice can be drawn for.
 #[derive(Debug, Clone, Serialize)]
@@ -814,6 +855,9 @@ pub fn advise(
         finances: None,
         formation,
         eleven,
+        own_tactic: false,
+        tactic_style: None,
+        readiness: Vec::new(),
         team: options.team,
         teams: Vec::new(),
         squad_size: members.len(),

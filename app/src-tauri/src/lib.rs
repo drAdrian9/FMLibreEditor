@@ -2559,6 +2559,76 @@ fn club_advice(
     advice.finances = connection.session.club_details(summary).ok().flatten().and_then(|details| details.finances);
     advice.team = team_index;
     advice.teams = choices;
+
+    // Who is not ready: the team's rows as its squad screen reads them, and each one's injuries, bans and reasons to
+    // be unhappy. The injured and the banned are left out of the eleven.
+    let mut unavailable = std::collections::HashSet::new();
+    if let Some(team) = picked {
+        for member in team.players.iter().filter(|m| m.plays_here && m.loan != Some(Loan::Out)) {
+            let Some(player) = connection.players.get(member.uid) else {
+                continue;
+            };
+            let injuries =
+                if member.injuries > 0 { connection.session.injuries(player).unwrap_or_default() } else { Vec::new() };
+            let bans = if member.bans > 0 { connection.session.bans(player).unwrap_or_default() } else { Vec::new() };
+            if member.injuries > 0 || member.bans > 0 {
+                unavailable.insert(member.uid);
+            }
+            let contract = connection.session.player_details(player).ok().flatten().and_then(|d| d.contract);
+            let happiness = contract.as_ref().map(|c| c.happiness);
+            let concerns = contract.map_or(0, |c| c.concerns.iter().filter(|x| x.ended.is_none()).count());
+            let worried = member.injuries > 0
+                || member.bans > 0
+                || member.condition < fmlibre_core::TIRED
+                || member.match_sharpness < fmlibre_core::UNSHARP
+                || member.jadedness > fmlibre_core::JADED
+                || member.morale <= fmlibre_core::LOW_MORALE
+                || happiness.is_some_and(|h| h < 0)
+                || concerns > 0;
+            if worried {
+                advice.readiness.push(fmlibre_core::Readiness {
+                    player: player.clone(),
+                    injuries,
+                    bans,
+                    condition: member.condition,
+                    match_sharpness: member.match_sharpness,
+                    jadedness: member.jadedness,
+                    morale: member.morale,
+                    happiness,
+                    concerns,
+                });
+            }
+        }
+    }
+    advice.readiness.sort_by_key(|r| (r.injuries.is_empty(), r.bans.is_empty(), r.condition));
+
+    // The eleven again, without those who cannot play, and in the manager's own tactic where asked and readable.
+    let available: Vec<&PlayerSummary> =
+        squad.iter().filter(|uid| !unavailable.contains(*uid)).filter_map(|&uid| connection.players.get(uid)).collect();
+    let own = if options.use_tactic && team_index == 0 {
+        connection.session.club_tactics(summary, &connection.players).ok().and_then(|tactics| {
+            let tactic = tactics.into_iter().next()?;
+            let positions: Vec<&'static str> = tactic.slots.iter().filter_map(|slot| slot.position).collect();
+            let shape: [&'static str; 11] = positions.try_into().ok()?;
+            Some((shape, tactic.style))
+        })
+    } else {
+        None
+    };
+    match own {
+        Some((shape, style)) => {
+            advice.eleven = fmlibre_core::best_eleven(&available, &shape);
+            advice.own_tactic = true;
+            advice.tactic_style = style;
+        }
+        None => {
+            let (_, shape) = fmlibre_core::FORMATIONS
+                .iter()
+                .find(|(name, _)| *name == advice.formation)
+                .unwrap_or(&fmlibre_core::FORMATIONS[0]);
+            advice.eleven = fmlibre_core::best_eleven(&available, shape);
+        }
+    }
     // Each player's profile: his asking price, and what bears on whether he would come.
     fmlibre_core::refine(&mut advice, |player| connection.session.player_details(player).ok().flatten(), &options);
     Ok(advice)
