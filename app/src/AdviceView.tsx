@@ -25,7 +25,10 @@ import type {
   StaffSummary,
 } from "./types";
 
-type Section = "squad" | "staff";
+type Section = "squad" | "eleven" | "staff";
+
+/** The formations the suggested eleven can be drawn in (see `FORMATIONS` in advice.rs). */
+const FORMATIONS = ["4-3-3", "4-2-3-1", "4-4-2", "4-1-4-1", "4-4-1-1", "3-5-2", "3-4-3", "5-3-2"];
 
 /** The oldest a suggested player may be, as the select offers it. */
 const MAX_AGES = [21, 23, 25, 28, 30, 32, 35];
@@ -55,6 +58,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
   const [humanClubs, setHumanClubs] = useState<{ uid: number; name: string }[]>([]);
   const [club, setClub] = useState<number | null>(null);
   const [team, setTeam] = useState(0);
+  const [formation, setFormation] = useState(FORMATIONS[0]);
   const [maxAge, setMaxAge] = useState(32);
   const [realistic, setRealistic] = useState(true);
   const [interested, setInterested] = useState(true);
@@ -96,13 +100,13 @@ export function AdviceView({ version, active }: { version: number; active: boole
   }, [version]);
 
   useEffect(() => {
-    const key = JSON.stringify([version, club, team, maxAge, realistic, interested, again]);
+    const key = JSON.stringify([version, club, team, formation, maxAge, realistic, interested, again]);
     if (!active || drawn.current === key) {
       return;
     }
     drawn.current = key;
     const mine = ++asked.current;
-    const options: AdviceOptions = { maxAge, realistic, interested, perRole: PER_ROLE, team };
+    const options: AdviceOptions = { maxAge, realistic, interested, perRole: PER_ROLE, team, formation };
     setBusy(true);
     setError(null);
     call<ClubAdvice>("club_advice", { club, options })
@@ -125,7 +129,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
           setBusy(false);
         }
       });
-  }, [active, version, club, team, maxAge, realistic, interested, again]);
+  }, [active, version, club, team, formation, maxAge, realistic, interested, again]);
 
   const shownRole = advice?.roles.find((r) => r.key === role) ?? null;
   const shownJob = advice?.staff.find((s) => s.key === job) ?? null;
@@ -198,7 +202,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
           <>
             <Summary advice={advice} />
             <div className="profile-tabs advice-tabs" role="tablist">
-              {(["squad", "staff"] as const).map((id) => (
+              {(["squad", "eleven", "staff"] as const).map((id) => (
                 <button
                   key={id}
                   type="button"
@@ -212,7 +216,14 @@ export function AdviceView({ version, active }: { version: number; active: boole
               ))}
             </div>
             <div className={busy ? "advice-body stale" : "advice-body"}>
-              {section === "squad" ? (
+              {section === "eleven" ? (
+                <Eleven
+                  advice={advice}
+                  formation={formation}
+                  onFormation={setFormation}
+                  onOpen={setShownPlayer}
+                />
+              ) : section === "squad" ? (
                 <>
                   <ul className="advice-list">
                     {advice.roles.map((r) => (
@@ -612,3 +623,91 @@ function JobDetail({ job, onOpen }: { job: StaffAdvice; onOpen: (member: StaffSu
     </div>
   );
 }
+
+/** The line of the pitch a position is played in, from the attack down: where the suggested eleven draws it. */
+function lineOf(position: string): number {
+  if (position === "st") return 0;
+  if (["aml", "amc", "amr"].includes(position)) return 1;
+  if (["ml", "mc", "mr"].includes(position)) return 2;
+  if (position === "dm") return 3;
+  if (["wbl", "wbr"].includes(position)) return 3.5;
+  if (["dl", "dc", "dr"].includes(position)) return 4;
+  return 5;
+}
+
+/** Left to right within a line. */
+function sideOf(position: string): number {
+  if (["dl", "wbl", "ml", "aml"].includes(position)) return 0;
+  if (["dr", "wbr", "mr", "amr"].includes(position)) return 2;
+  return 1;
+}
+
+/**
+ * The suggested eleven, laid out as on a pitch with the attack on top: for each place, who of the team is worth most
+ * there, his rating in the position and his current ability. Only a suggestion: the game's team selection is not changed.
+ */
+function Eleven({
+  advice,
+  formation,
+  onFormation,
+  onOpen,
+}: {
+  advice: ClubAdvice;
+  formation: string;
+  onFormation: (formation: string) => void;
+  onOpen: (player: PlayerSummary) => void;
+}) {
+  const picks = advice.eleven.map((pick, index) => ({ ...pick, index }));
+  const lines = [...new Set(picks.map((pick) => lineOf(pick.position)))].sort((a, b) => a - b);
+  const placed = picks.filter((pick) => pick.player !== null);
+  const average = placed.length > 0 ? Math.round(placed.reduce((sum, p) => sum + p.player!.currentAbility, 0) / placed.length) : null;
+  return (
+    <div className="advice-eleven">
+      <div className="advice-eleven-head">
+        <label className="advice-option">
+          {text.eleven.formation}
+          <select value={formation} onChange={(e) => onFormation(e.target.value)}>
+            {FORMATIONS.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {average !== null && <span className="muted">{text.eleven.average(average)}</span>}
+      </div>
+      <p className="view-note">{text.eleven.note}</p>
+      <div className="eleven-pitch">
+        {lines.map((line) => (
+          <div key={line} className="eleven-line">
+            {picks
+              .filter((pick) => lineOf(pick.position) === line)
+              .sort((a, b) => sideOf(a.position) - sideOf(b.position) || a.index - b.index)
+              .map((pick) => {
+                const player = pick.player;
+                return player === null ? (
+                  <div key={pick.index} className="eleven-card empty">
+                    <span className="eleven-pos">{positionLabel(pick.position)}</span>
+                    <span className="muted">{text.eleven.nobody}</span>
+                  </div>
+                ) : (
+                  <button key={pick.index} type="button" className="eleven-card" onClick={() => onOpen(player)}>
+                    <span className="eleven-pos">{positionLabel(pick.position)}</span>
+                    <span className="eleven-name">{player.name}</span>
+                    <span className="eleven-facts">
+                      <span className={`value ${tierClass(pick.rating)}`} title={text.columns.ratingTitle}>
+                        {pick.rating}
+                      </span>
+                      <Ability value={player.currentAbility} />
+                      <span className="muted">{player.age ?? ""}</span>
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

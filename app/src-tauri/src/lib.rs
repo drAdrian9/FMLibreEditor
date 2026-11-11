@@ -3649,6 +3649,83 @@ fn team_action(state: State<'_, AppState>, club: u32, team: usize, action: TeamA
     Ok(connection.write_planned(Entity::Player, plan.planned, batch))
 }
 
+/// How far Make WonderKid goes: the potential ability it gives, and the least a player then has of what makes a young
+/// player grow (as FM shows it, 1–20): professionalism and ambition, determination, consistency and big-match temper,
+/// with injury proneness kept at most this low.
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum WonderLevel {
+    /// A good young player: potential 155.
+    Prospect,
+    /// One of the best of his age: potential 175.
+    Wonderkid,
+    /// A once-in-a-generation talent: potential 195.
+    Generational,
+}
+
+impl WonderLevel {
+    /// (potential ability, at least these: professionalism, ambition, determination, consistency, important matches,
+    /// and injury proneness at most).
+    fn targets(self) -> (i64, [(&'static str, i64); 5], i64) {
+        let (pa, prof, amb, det, con, imp, inj) = match self {
+            WonderLevel::Prospect => (155, 15, 15, 14, 12, 12, 9),
+            WonderLevel::Wonderkid => (175, 18, 17, 16, 14, 14, 6),
+            WonderLevel::Generational => (195, 20, 19, 18, 16, 16, 3),
+        };
+        let raised = [
+            ("personality.professionalism", prof),
+            ("personality.ambition", amb),
+            ("attribute.determination", det),
+            ("attribute.consistency", con),
+            ("attribute.important_matches", imp),
+        ];
+        (pa, raised, inj)
+    }
+}
+
+/// Makes the player `uid` a young talent of `level`: his potential ability rises to the level's, and what makes a young
+/// player grow rises to it too, with his injury proneness brought down; nothing already better is lowered, and his
+/// current ability and other attributes are left as they are, so he still has to grow into it. Logged as one batch,
+/// which `undo_batch` undoes.
+#[tauri::command]
+fn make_wonderkid(state: State<'_, AppState>, uid: u32, level: WonderLevel) -> Result<MassReport, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    let player = connection.players.get(uid).ok_or_else(|| not_found(Entity::Player, uid))?;
+    let target = player.target();
+    let targets = [(target, player.name.clone())];
+    let (pa, raised, injuries) = level.targets();
+    let session = &connection.session;
+    let mut operations = Vec::new();
+    // A potential still a range (negative) counts as lower than any.
+    let potential = session.field(Entity::Player, "potential_ability")?;
+    if session.read_field(&target, &potential)? < pa {
+        operations.push((potential, Operation::Set { value: pa }));
+    }
+    for (key, least) in raised {
+        let field = session.field(Entity::Player, key)?;
+        let wanted = field.scale.stored(least);
+        if session.read_field(&target, &field)? < wanted {
+            operations.push((field, Operation::Set { value: wanted }));
+        }
+    }
+    let proneness = session.field(Entity::Player, "attribute.injury_proneness")?;
+    let wanted = proneness.scale.stored(injuries);
+    if session.read_field(&target, &proneness)? > wanted {
+        operations.push((proneness, Operation::Set { value: wanted }));
+    }
+    let plan = connection.session.plan_mass_edit(&targets, &operations)?;
+    let batch = connection.fresh_id();
+    let mut report = connection.write_planned(Entity::Player, plan.planned, batch);
+    report.failed.extend(plan.skipped.into_iter().map(|skipped| MassFailure {
+        uid: skipped.uid,
+        name: skipped.name,
+        field: skipped.field,
+        error: Failure { code: skipped.code, params: skipped.params, message: skipped.reason },
+    }));
+    Ok(report)
+}
+
 /// Sets every attribute of the player `uid` to its best, as Max attributes does for a team: 20, and 1 for injury
 /// proneness and dirtiness. The changes are logged as one batch, which `undo_batch` undoes.
 #[tauri::command]
@@ -3905,6 +3982,7 @@ pub fn run() {
             set_captain,
             team_action,
             max_attributes,
+            make_wonderkid,
             graphics_info,
             can_self_update,
             restart_app,

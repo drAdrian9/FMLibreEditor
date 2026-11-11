@@ -5981,3 +5981,149 @@ button.danger:hover:not(:disabled) {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* Make WonderKid beside Max attributes: the level picked, then the button. */
+.wonderkid-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wonderkid-level {
+  min-height: 28px;
+}
+
+/* The mass-edit presets: a line above the rows with the saved ones, Delete, and Save with a name. */
+.mass-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 10px;
+}
+
+.mass-preset-select {
+  min-width: 200px;
+  max-width: 100%;
+}
+
+.mass-preset-name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mass-preset-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Quick search: a sentence turned into the player list's filters, above the filter bar. */
+.quick-search {
+  padding: 0 0 8px;
+}
+
+.quick-search-form {
+  display: flex;
+  gap: 8px;
+  max-width: 900px;
+}
+
+.quick-search-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-search-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.quick-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+/* The Advisor's best eleven: the formation picked, then the places laid out as on a pitch, the attack on top. */
+.advice-eleven {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.advice-eleven-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.eleven-pitch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 980px;
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.eleven-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  gap: 10px;
+}
+
+.eleven-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 170px;
+  min-height: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-align: left;
+}
+
+.eleven-card:hover {
+  border-color: var(--border-strong);
+}
+
+.eleven-card.empty {
+  opacity: 0.6;
+}
+
+.eleven-pos {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.eleven-name {
+  overflow: hidden;
+  max-width: 100%;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eleven-facts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}

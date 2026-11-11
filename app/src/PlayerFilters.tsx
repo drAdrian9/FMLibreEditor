@@ -40,6 +40,8 @@ export interface PlayerFilterFields extends PersonFilterFields {
   maxAskingPrice: string;
   minValue: string;
   maxValue: string;
+  /** Part of a nation's name whose players are left out. */
+  excludeNation: string;
 }
 
 export const NO_PLAYER_FILTERS: PlayerFilterFields = {
@@ -56,6 +58,7 @@ export const NO_PLAYER_FILTERS: PlayerFilterFields = {
   maxAskingPrice: "",
   minValue: "",
   maxValue: "",
+  excludeNation: "",
 };
 
 /** A whole number from 1 to 200, as an ability; nothing for an empty or unreadable input. */
@@ -88,6 +91,7 @@ export function toPlayerFilter(fields: PlayerFilterFields): PlayerFilter | undef
     maxAskingPrice: pounds(fields.maxAskingPrice),
     minValue: pounds(fields.minValue),
     maxValue: pounds(fields.maxValue),
+    excludeNation: fields.excludeNation.trim() || undefined,
   };
   return countFilters(filter) > 0 ? filter : undefined;
 }
@@ -108,6 +112,7 @@ export function countFilters(filter: PlayerFilter | undefined): number {
     filter.minWage ?? filter.maxWage,
     filter.minAskingPrice ?? filter.maxAskingPrice,
     filter.minValue ?? filter.maxValue,
+    filter.excludeNation,
   ].filter(
     (value) => value !== undefined,
   ).length;
@@ -241,6 +246,7 @@ export function PlayerFilterBar({ fields, onChange, active, genderKnown, actions
         wide
       />
       <TextInput label={text.nation} {...input("nation")} />
+      <TextInput label={text.excludeNation} {...input("excludeNation")} />
       <TextInput label={text.club} {...input("club")} />
       <CheckInput label={text.freeAgentsOnly} {...input("freeAgents")} />
       <ContractEndInput {...input("contractExpiresBy")} />

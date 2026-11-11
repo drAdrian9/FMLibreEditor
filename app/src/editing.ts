@@ -94,6 +94,16 @@ export const freezeTeam = (club: number, team: number, kind: FreezeKind, frozen:
  */
 export const maxAttributes = (uid: number) => call<MassReport>("max_attributes", { uid });
 
+/** How far Make WonderKid goes (see `make_wonderkid`). */
+export type WonderLevel = "prospect" | "wonderkid" | "generational";
+
+/**
+ * Makes the player a young talent of `level`: his potential and what makes a young player grow rise to it, nothing
+ * better is lowered, and his current ability stays. Logged as one batch, which `undoBatch` takes back.
+ */
+export const makeWonderkid = (uid: number, level: WonderLevel) =>
+  call<MassReport>("make_wonderkid", { uid, level });
+
 /**
  * Sets every attribute of the member of staff `id` to its best: 20. The changes are logged as one batch, undone with
  * `undoBatch`; `applied` counts them.

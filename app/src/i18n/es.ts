@@ -801,6 +801,12 @@ export const es: Strings = {
 
     // Sobre los atributos, mientras se lee el perfil
     maxAttributes: "Atributos al máximo",
+    wonderkid: "Hacer WonderKid",
+    wonderkidLevel: "Nivel de WonderKid",
+    wonderkidLevels: { prospect: "Promesa (CP 155)", wonderkid: "WonderKid (CP 175)", generational: "Generacional (CP 195)" },
+    wonderkidTitle:
+      "Sube su potencial, profesionalidad, ambición, determinación, regularidad y carácter en partidos importantes al nivel, y baja su propensión a lesionarse; nada mejor se baja y su habilidad actual se queda",
+    wonderkidDone: (count) => (count === 0 ? "Ya es al menos así de bueno" : count === 1 ? "1 cambio escrito" : `${count} cambios escritos`),
     maxAttributesTitle:
       "Poner cada atributo de este jugador en su mejor valor: 20, y 1 para la propensión a lesiones y el juego sucio",
     maxAttributesDone: (count) =>
@@ -899,6 +905,15 @@ export const es: Strings = {
       contractExpires: "fin de contrato",
     },
     filters: {
+      excludeNation: "Excluir país",
+      quick: {
+        label: "Búsqueda rápida",
+        placeholder: "p. ej. striker local u23 pa 140+ value < 5M · free agent dc ca 120",
+        apply: "Buscar",
+        understood: "Entendido:",
+        unknown: (words) => `No entendido: ${words}`,
+        nothing: "No se entendió nada. Prueba una posición, una edad (u23), CA/CP (pa 140+), dinero (value < 5M).",
+      },
       toggle: "Filtros",
       toggleActive: (count) => (count === 1 ? "Filtros, 1 activo" : `Filtros, ${count} activos`),
       clear: "Borrar",
@@ -1357,7 +1372,13 @@ export const es: Strings = {
       wage: "Sueldo por encima del presupuesto",
       fee: "Traspaso por encima del presupuesto",
     },
-    sections: { squad: "Demarcaciones", staff: "Cuerpo técnico" },
+    sections: { squad: "Demarcaciones", eleven: "Mejor XI", staff: "Cuerpo técnico" },
+    eleven: {
+      formation: "Formación",
+      average: (ca) => `CA media ${ca}`,
+      note: "El jugador de este equipo que más vale en cada puesto, por su valoración en la posición y su habilidad actual. Solo una sugerencia: tu alineación en el juego no cambia. No se tienen en cuenta lesiones ni sanciones.",
+      nobody: "No queda nadie",
+    },
     summary: {
       squad: "Primer equipo",
       averageAge: "Edad media",
@@ -1554,6 +1575,21 @@ export const es: Strings = {
   },
 
   massEdit: {
+    presets: {
+      label: "Ajustes guardados",
+      none: "No hay ajustes guardados",
+      choose: "Cargar un ajuste…",
+      save: "Guardar como ajuste",
+      delete: "Eliminar",
+      nameLabel: "Nombre del ajuste",
+      namePlaceholder: "p. ej. Refrescar Sub-21",
+      confirm: "Guardar",
+      cancel: "Cancelar",
+      saved: (name) => `Guardado «${name}»`,
+      deleted: (name) => `Eliminado «${name}»`,
+      full: (max) => `No hay sitio: ${max} ajustes como mucho. Elimina uno antes.`,
+      cannotSave: "Aquí no se pueden guardar ajustes (el almacenamiento del navegador no está disponible).",
+    },
     button: "Edición masiva",
     buttonTitle: "Cambiar valores de todo lo que muestra la lista, con una vista previa antes",
     title: {

@@ -80,11 +80,13 @@ pub struct AdviceOptions {
     pub interested: bool,
     /// Which of the club's teams to advise on, by its place in the club's list: 0 is the senior team.
     pub team: usize,
+    /// The formation of the suggested eleven (see [`FORMATIONS`]); the first one when it names none.
+    pub formation: Option<String>,
 }
 
 impl Default for AdviceOptions {
     fn default() -> Self {
-        Self { max_age: 32, realistic: true, per_role: 10, interested: true, team: 0 }
+        Self { max_age: 32, realistic: true, per_role: 10, interested: true, team: 0, formation: None }
     }
 }
 
@@ -137,7 +139,106 @@ pub struct ClubAdvice {
     pub level: u16,
     /// The places of the team, from the goalkeeper up.
     pub roles: Vec<RoleAdvice>,
+    /// The formation of the suggested eleven, and the eleven: the best player of the team for each place.
+    pub formation: &'static str,
+    pub eleven: Vec<XiPick>,
     pub staff: Vec<StaffAdvice>,
+}
+
+/// The formations a suggested eleven can be drawn in, each place by the position it is played in, from the goalkeeper
+/// up: the back line from left to right, then the midfield and the attack.
+pub const FORMATIONS: [(&str, [&str; 11]); 8] = [
+    ("4-3-3", ["gk", "dl", "dc", "dc", "dr", "dm", "mc", "mc", "aml", "amr", "st"]),
+    ("4-2-3-1", ["gk", "dl", "dc", "dc", "dr", "dm", "dm", "aml", "amc", "amr", "st"]),
+    ("4-4-2", ["gk", "dl", "dc", "dc", "dr", "ml", "mc", "mc", "mr", "st", "st"]),
+    ("4-1-4-1", ["gk", "dl", "dc", "dc", "dr", "dm", "ml", "mc", "mc", "mr", "st"]),
+    ("4-4-1-1", ["gk", "dl", "dc", "dc", "dr", "ml", "mc", "mc", "mr", "amc", "st"]),
+    ("3-5-2", ["gk", "dc", "dc", "dc", "wbl", "dm", "mc", "mc", "wbr", "st", "st"]),
+    ("3-4-3", ["gk", "dc", "dc", "dc", "wbl", "mc", "mc", "wbr", "aml", "amr", "st"]),
+    ("5-3-2", ["gk", "wbl", "dc", "dc", "dc", "wbr", "mc", "mc", "mc", "st", "st"]),
+];
+
+/// One place of a suggested eleven and who plays it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct XiPick {
+    /// The position the place is played in (see [`POSITIONS`]).
+    pub position: &'static str,
+    pub player: Option<PlayerSummary>,
+    /// His rating in the position, 1–20.
+    pub rating: u8,
+}
+
+/// How much a player is worth in a place: his current ability, as much of it as he can bring to a position he plays
+/// less well, and next to nothing where he is no more than a stopgap.
+fn place_value(player: &PlayerSummary, position: usize) -> i64 {
+    let rating = i64::from(player.position_ratings[position]);
+    let ability = i64::from(player.current_ability);
+    match rating {
+        18.. => ability * 100,
+        15..=17 => ability * (70 + rating),
+        10..=14 => ability * rating * 3,
+        _ => ability * rating,
+    }
+}
+
+/// The best eleven of `members` in `formation`: each player in at most one place, chosen so that the eleven together
+/// are worth the most (see `place_value`): the best pairs first, then any two players who would do better swapped.
+pub fn best_eleven(members: &[&PlayerSummary], formation: &[&'static str; 11]) -> Vec<XiPick> {
+    let index_of = |key: &str| POSITIONS.iter().position(|&k| k == key).expect("a position");
+    let places: Vec<usize> = formation.iter().map(|key| index_of(key)).collect();
+    let mut pairs: Vec<(i64, usize, usize)> = Vec::new();
+    for (slot, &position) in places.iter().enumerate() {
+        for (who, player) in members.iter().enumerate() {
+            pairs.push((place_value(player, position), slot, who));
+        }
+    }
+    pairs.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let mut chosen: Vec<Option<usize>> = vec![None; 11];
+    let mut used = vec![false; members.len()];
+    for (_, slot, who) in pairs {
+        if chosen[slot].is_none() && !used[who] {
+            chosen[slot] = Some(who);
+            used[who] = true;
+        }
+    }
+    // Swaps: two places, or a place and a player left out, whenever that is worth more; a few rounds settle it.
+    let value = |slot: usize, who: Option<usize>| who.map_or(0, |w| place_value(members[w], places[slot]));
+    for _ in 0..10 {
+        let mut better = false;
+        for a in 0..11 {
+            for b in a + 1..11 {
+                let now = value(a, chosen[a]) + value(b, chosen[b]);
+                if value(a, chosen[b]) + value(b, chosen[a]) > now {
+                    chosen.swap(a, b);
+                    better = true;
+                }
+            }
+            for (who, taken) in used.clone().iter().enumerate() {
+                if !taken && value(a, Some(who)) > value(a, chosen[a]) {
+                    if let Some(old) = chosen[a] {
+                        used[old] = false;
+                    }
+                    chosen[a] = Some(who);
+                    used[who] = true;
+                    better = true;
+                }
+            }
+        }
+        if !better {
+            break;
+        }
+    }
+    places
+        .iter()
+        .zip(formation)
+        .zip(chosen)
+        .map(|((&position, &key), who)| XiPick {
+            position: key,
+            player: who.map(|w| members[w].clone()),
+            rating: who.map_or(0, |w| members[w].position_ratings[position]),
+        })
+        .collect()
 }
 
 /// One of a club's teams the advice can be drawn for.
@@ -704,9 +805,15 @@ pub fn advise(
 
     let staff = STAFF_ROLES.iter().map(|role| staff_advice(club, role, staff, clubs, human_clubs, options)).collect();
 
+    let (formation, shape) =
+        FORMATIONS.iter().find(|(name, _)| options.formation.as_deref() == Some(name)).unwrap_or(&FORMATIONS[0]);
+    let eleven = best_eleven(&members, shape);
+
     ClubAdvice {
         club: club.clone(),
         finances: None,
+        formation,
+        eleven,
         team: options.team,
         teams: Vec::new(),
         squad_size: members.len(),
@@ -1181,5 +1288,20 @@ mod tests {
         let keeper = advice.roles.iter().find(|r| r.key == "gk").expect("a goalkeeper's place");
         assert!(keeper.candidates.iter().any(|c| c.player.uid == 101), "the young keeper");
         assert!(keeper.candidates.iter().all(|c| c.player.age.is_some_and(|age| age <= 21)));
+    }
+
+    #[test]
+    fn the_eleven_puts_each_player_where_he_is_worth_most() {
+        let keeper = player(1, 120, 25, Some(1), &[("gk", 20)]);
+        let striker = player(2, 150, 25, Some(1), &[("st", 20), ("amc", 15)]);
+        let playmaker = player(3, 140, 25, Some(1), &[("amc", 20), ("st", 12)]);
+        let members = [&keeper, &striker, &playmaker];
+        let eleven = best_eleven(&members, &FORMATIONS[1].1);
+        let at =
+            |key: &str| eleven.iter().find(|pick| pick.position == key).and_then(|p| p.player.as_ref()).map(|p| p.uid);
+        assert_eq!(at("gk"), Some(1));
+        assert_eq!(at("st"), Some(2));
+        assert_eq!(at("amc"), Some(3));
+        assert_eq!(eleven.iter().filter(|pick| pick.player.is_some()).count(), 3, "three players for eleven places");
     }
 }

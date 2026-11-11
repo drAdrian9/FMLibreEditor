@@ -2511,6 +2511,7 @@ function matchesPlayerFilter(p: PlayerSummary, f: PlayerFilter): boolean {
     inBounds(d?.askingPrice ?? null, f.minAskingPrice, f.maxAskingPrice) &&
     inBounds(d?.value ?? null, f.minValue, f.maxValue) &&
     contains(p.nation, f.nation) &&
+    !(f.excludeNation?.trim() && p.nation !== null && contains(p.nation, f.excludeNation)) &&
     contains(p.club, f.club) &&
     (f.clubUid === undefined || p.clubUid === f.clubUid) &&
     (!f.freeAgents || p.club === null) &&
@@ -2895,9 +2896,28 @@ function clubAdvice(uid: number | null, options: AdviceOptions): ClubAdvice {
   });
 
   const ages = squad.map((p) => p.age).filter((a): a is number => a !== null);
+  // The eleven as the real command draws it, roughly: the best player still free who plays each place.
+  const shapes: Record<string, string[]> = {
+    "4-3-3": ["gk", "dl", "dc", "dc", "dr", "dm", "mc", "mc", "aml", "amr", "st"],
+    "4-4-2": ["gk", "dl", "dc", "dc", "dr", "ml", "mc", "mc", "mr", "st", "st"],
+    "3-5-2": ["gk", "dc", "dc", "dc", "wbl", "dm", "mc", "mc", "wbr", "st", "st"],
+  };
+  const formation = options.formation && shapes[options.formation] ? options.formation : "4-3-3";
+  const taken = new Set<number>();
+  const eleven = shapes[formation].map((position) => {
+    const player = [...squad]
+      .sort((a, b) => b.currentAbility - a.currentAbility)
+      .find((p) => !taken.has(p.uid) && p.positions.includes(position)) ?? null;
+    if (player) {
+      taken.add(player.uid);
+    }
+    return { position, player, rating: player ? 18 : 0 };
+  });
   return {
     club,
     finances: club.women ? null : clubDetails(club).finances,
+    formation,
+    eleven,
     team: 0,
     teams: [{ index: 0, kind: 0, ageLimit: null, players: squad.length }],
     squadSize: squad.length,
@@ -3180,6 +3200,26 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       }
       const report: MassReport = { batch: nextMassId++, applied: 0, failed: [] };
       setValues(player, ATTRIBUTES.map(bestAttribute), report);
+      return report as T;
+    }
+    case "make_wonderkid": {
+      const uid = Number(args?.uid);
+      const player = players.find((p) => p.uid === uid);
+      if (!player) {
+        throw notFound("player", uid);
+      }
+      const pa = { prospect: 155, wonderkid: 175, generational: 195 }[String(args?.level)] ?? 175;
+      const report: MassReport = { batch: nextMassId++, applied: 0, failed: [] };
+      setValues(
+        player,
+        [
+          ["potential_ability", Math.max(pa, player.potentialAbility)],
+          ["personality.professionalism", 18],
+          ["personality.ambition", 17],
+          ["attribute.determination", 80],
+        ],
+        report,
+      );
       return report as T;
     }
     case "max_staff_attributes": {

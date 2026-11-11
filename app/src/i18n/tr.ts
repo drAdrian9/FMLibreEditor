@@ -780,6 +780,12 @@ export const tr: Strings = {
 
     // Above the attributes, while the profile is read
     maxAttributes: "Özellikleri tamamla",
+    wonderkid: "Harika çocuk yap",
+    wonderkidLevel: "Harika çocuk seviyesi",
+    wonderkidLevels: { prospect: "Gelecek vaat eden (PY 155)", wonderkid: "Harika çocuk (PY 175)", generational: "Nesil yeteneği (PY 195)" },
+    wonderkidTitle:
+      "Potansiyelini, profesyonelliğini, hırsını, kararlılığını, istikrarını ve büyük maç karakterini seviyeye çıkarır, sakatlık eğilimini düşürür; daha iyisi düşürülmez, mevcut yeteneği aynı kalır",
+    wonderkidDone: (count) => (count === 0 ? "Zaten en az bu kadar iyi" : `${changes(count)} yazıldı`),
     maxAttributesTitle: "Bu oyuncunun bütün özelliklerini en iyiye çıkar: 20; sakatlık eğilimi ve sertlik için 1",
     maxAttributesDone: (count) => (count === 0 ? "Bütün özellikleri zaten en iyide" : `${changes(count)} yazıldı`),
     maxAttributesUndone: (count) => (count === 0 ? "Hiçbir şey geri alınmadı" : `${changes(count)} geri alındı`),
@@ -867,6 +873,15 @@ export const tr: Strings = {
       contractExpires: "sözleşme bitişi",
     } satisfies Record<PlayerSort, string>,
     filters: {
+      excludeNation: "Ülke hariç",
+      quick: {
+        label: "Hızlı arama",
+        placeholder: "örn. striker yerli u23 pa 140+ value < 5M · free agent dc ca 120",
+        apply: "Bul",
+        understood: "Anlaşılan:",
+        unknown: (words) => `Anlaşılmayan: ${words}`,
+        nothing: "Hiçbir şey anlaşılmadı. Bir mevki, yaş (u23), MY/PY (pa 140+), para (value < 5M) deneyin.",
+      },
       toggle: "Filtreler",
       toggleActive: (count) => `Filtreler, ${count} etkin`,
       clear: "Temizle",
@@ -1307,7 +1322,13 @@ export const tr: Strings = {
       wage: "Maaş bütçeyi aşıyor",
       fee: "Bedel bütçeyi aşıyor",
     },
-    sections: { squad: "Mevkiler", staff: "Personel" },
+    sections: { squad: "Mevkiler", eleven: "En iyi 11", staff: "Personel" },
+    eleven: {
+      formation: "Diziliş",
+      average: (ca) => `Ortalama MY ${ca}`,
+      note: "Her mevki için bu takımın en değerli oyuncusu: mevkideki reytingi ve mevcut yeteneğiyle. Yalnızca öneri; oyundaki kadro seçiminiz değişmez. Sakatlık ve cezalar hesaba katılmaz.",
+      nobody: "Kimse kalmadı",
+    },
     summary: {
       squad: "A takım kadrosu",
       averageAge: "Yaş ortalaması",
@@ -1494,6 +1515,21 @@ export const tr: Strings = {
   },
 
   massEdit: {
+    presets: {
+      label: "Kayıtlı ön ayarlar",
+      none: "Kayıtlı ön ayar yok",
+      choose: "Ön ayar yükle…",
+      save: "Ön ayar olarak kaydet",
+      delete: "Sil",
+      nameLabel: "Ön ayarın adı",
+      namePlaceholder: "ör. U21'i dinlendir",
+      confirm: "Kaydet",
+      cancel: "İptal",
+      saved: (name) => `“${name}” kaydedildi`,
+      deleted: (name) => `“${name}” silindi`,
+      full: (max) => `Yer yok: en fazla ${max} ön ayar. Önce birini silin.`,
+      cannotSave: "Ön ayarlar burada kaydedilemiyor (tarayıcı depolaması kullanılamıyor).",
+    },
     button: "Toplu düzenleme",
     buttonTitle: "Listenin gösterdiği her şeyin değerlerini, önce önizleme yaparak değiştir",
     title: {

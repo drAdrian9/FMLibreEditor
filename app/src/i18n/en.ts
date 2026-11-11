@@ -743,6 +743,14 @@ export const en = {
     // Above the attributes, while the profile is read
     /** Sets every attribute of the player to its best at once. */
     maxAttributes: "Max attributes",
+    /** Make WonderKid: the level picked beside it, the button, and what it wrote. */
+    wonderkid: "Make WonderKid",
+    wonderkidLevel: "How far Make WonderKid goes",
+    wonderkidLevels: { prospect: "Prospect (PA 155)", wonderkid: "WonderKid (PA 175)", generational: "Generational (PA 195)" },
+    wonderkidTitle:
+      "Raises his potential ability, professionalism, ambition, determination, consistency and big-match temper to the level, and lowers his injury proneness; nothing better is lowered, and his current ability stays, so he still has to grow",
+    wonderkidDone: (count: number) =>
+      count === 0 ? "Already at least that good" : count === 1 ? "1 change written" : `${count} changes written`,
     maxAttributesTitle: "Set every attribute of this player to its best: 20, and 1 for injury proneness and dirtiness",
     /** What Max attributes wrote, beside the button that takes it back; then what that undid. */
     maxAttributesDone: (count: number) =>
@@ -847,6 +855,17 @@ export const en = {
     } satisfies Record<PlayerSort, string>,
     /** The filters; the staff list has those that are not about players too (see FilterBar.tsx). */
     filters: {
+      /** Leaves out the players of a nation: a club's foreign players are those not of its own. */
+      excludeNation: "Not nation",
+      /** The quick search above the filters: a sentence turned into them. */
+      quick: {
+        label: "Quick search",
+        placeholder: "e.g. striker lokal u23 pa 140+ nilai < 5B · kiper asing umur 25-30 gaji max 100jt · free agent dc ca 120",
+        apply: "Find",
+        understood: "Understood:",
+        unknown: (words: string) => `Not understood: ${words}`,
+        nothing: "Nothing understood. Try a position, an age (u23), CA/PA (pa 140+), money (nilai < 5B), lokal/asing.",
+      },
       /** The button that shows or hides the filters. */
       toggle: "Filters",
       /** Its name for assistive technology while `count` of the filters are in effect. */
@@ -1404,7 +1423,14 @@ export const en = {
       wage: "Wage over budget",
       fee: "Fee over budget",
     },
-    sections: { squad: "Positions", staff: "Staff" },
+    sections: { squad: "Positions", eleven: "Best XI", staff: "Staff" },
+    /** The suggested eleven. */
+    eleven: {
+      formation: "Formation",
+      average: (ca: number) => `Average CA ${ca}`,
+      note: "The player of this team worth most in each place, by his rating in the position and his current ability. A suggestion only: your team selection in the game is not changed. Injuries and bans are not taken into account.",
+      nobody: "No one left",
+    },
     summary: {
       squad: "Senior squad",
       averageAge: "Average age",
@@ -1619,6 +1645,22 @@ export const en = {
 
   /** Mass editing: the button in the toolbar of a list and the dialog it opens. */
   massEdit: {
+    /** Presets: the rows of the dialog saved under a name, to fill them again with one pick. */
+    presets: {
+      label: "Saved presets",
+      none: "No saved presets",
+      choose: "Load a preset…",
+      save: "Save as preset",
+      delete: "Delete",
+      nameLabel: "Name of the preset",
+      namePlaceholder: "e.g. Refresh U21",
+      confirm: "Save",
+      cancel: "Cancel",
+      saved: (name: string) => `Saved “${name}”`,
+      deleted: (name: string) => `Deleted “${name}”`,
+      full: (max: number) => `No room: ${max} presets at most. Delete one first.`,
+      cannotSave: "Presets cannot be saved here (the browser storage is unavailable).",
+    },
     /** The button in the toolbar of the player, staff and club lists. */
     button: "Mass edit",
     buttonTitle: "Change values of everything the list shows, with a preview first",

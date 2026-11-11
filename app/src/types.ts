@@ -384,6 +384,8 @@ export interface PlayerFilter extends PersonFilter {
   /** Bounds on the transfer value, in pounds. */
   minValue?: number;
   maxValue?: number;
+  /** Leaves out the players whose nation's name has this in it: a club's foreign players are those not of its own. */
+  excludeNation?: string;
 }
 
 export type PlayerSort =
@@ -1250,6 +1252,16 @@ export interface AdviceOptions {
   perRole: number;
   /** Which of the club's teams, by its place in the club's list: 0 is the senior team. */
   team?: number;
+  /** The formation of the suggested eleven, e.g. "4-3-3". */
+  formation?: string;
+}
+
+/** One place of the suggested eleven: the position it is played in, and who plays it (none where no one is left). */
+export interface XiPick {
+  position: string;
+  player: PlayerSummary | null;
+  /** His rating in the position, 1–20. */
+  rating: number;
 }
 
 /** One of a club's teams the advice can be drawn for. */
@@ -1351,5 +1363,8 @@ export interface ClubAdvice {
   /** The average current ability of the squad's best eleven. */
   level: number;
   roles: RoleAdvice[];
+  /** The formation of the suggested eleven, and the eleven, from the goalkeeper up. */
+  formation: string;
+  eleven: XiPick[];
   staff: StaffAdvice[];
 }

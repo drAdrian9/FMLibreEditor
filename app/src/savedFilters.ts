@@ -78,6 +78,7 @@ export function readFields(value: unknown): PlayerFilterFields {
     maxAskingPrice: textOr(given.maxAskingPrice, none.maxAskingPrice, isNumberText),
     minValue: textOr(given.minValue, none.minValue, isNumberText),
     maxValue: textOr(given.maxValue, none.maxValue, isNumberText),
+    excludeNation: textOr(given.excludeNation, none.excludeNation),
   };
 }
 

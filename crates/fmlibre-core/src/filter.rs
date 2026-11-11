@@ -79,6 +79,8 @@ pub struct PlayerFilter {
     pub max_value: Option<i32>,
     /// Part of the nation's name, accents and case ignored.
     pub nation: Option<String>,
+    /// Leaves out the players whose nation's name has this in it: the foreign players of a club, for one.
+    pub exclude_nation: Option<String>,
     /// Part of the club's name, accents and case ignored.
     pub club: Option<String>,
     /// Only players of the club with this UID, e.g. those a player can swap with.
@@ -115,6 +117,7 @@ impl PlayerFilter {
             && within(p.asking_price, self.min_asking_price, self.max_asking_price)
             && within(p.value, self.min_value, self.max_value)
             && contains(p.nation.as_deref(), self.nation.as_deref())
+            && excludes(p.nation.as_deref(), self.exclude_nation.as_deref())
             && contains(p.club.as_deref(), self.club.as_deref())
             && self.club_uid.is_none_or(|uid| p.club_uid == Some(uid))
             && (!self.free_agents || p.club.is_none())
@@ -127,6 +130,14 @@ impl PlayerFilter {
 }
 
 /// Whether `text` contains `needle`, ignoring accents and case; an empty needle matches anything.
+/// Whether `text` does not have `needle` in it, accents and case ignored; true for no needle, and for no text.
+fn excludes(text: Option<&str>, needle: Option<&str>) -> bool {
+    match needle.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(needle) => !text.is_some_and(|text| fold(text).contains(&fold(needle))),
+        None => true,
+    }
+}
+
 fn contains(text: Option<&str>, needle: Option<&str>) -> bool {
     match needle.map(str::trim).filter(|n| !n.is_empty()) {
         Some(needle) => text.is_some_and(|text| fold(text).contains(&fold(needle))),
