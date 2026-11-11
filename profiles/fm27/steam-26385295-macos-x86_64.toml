@@ -1,0 +1,28 @@
+# FM27 27.0.1 on Steam for macOS (app 4530370, build 26385295): the Intel half of the universal game_plugin, which Intel
+# Macs run, and Apple silicon Macs under Rosetta. Found in the file, not read in a running game: the code's RIP-relative
+# loads peak as they did in 27.0.0, 0x7A000 further on with __DATA (the arrays 0x20 more): 7,625 at the date, 185 and
+# 173 at the players' begin and end, 18 and 18 at the staff's, 105 and 93 at the clubs', 63 at the retirement manager's
+# static (27.0.0: 7,730, 184 and 170, 18 and 18, 105 and 93, 61).
+name = "FM27 Steam build 26385295 (27.0.1, macOS, Intel)"
+edition = 27
+storefront = "steam"
+
+# The in-game date.
+current_date = 0x5CE3700
+
+# The static pointer to the retirement manager, 0x9810 before the date as in 27.0.0; its class is checked before it is
+# used.
+retirement_manager = 0x5CD9EF0
+
+# A static pointer to the game's own object (game_plugin::GAME_UI): the one the code loads at 527 places, as the arm64
+# half loads game_plugin+0x57708F0 at 470. The globals around them are loaded alike, 0x20 further from the players' pair
+# here: 12, 20 or 24, then the static, then 23, 19 and 5. Its class is checked before it is used.
+
+# game_plugin as mapped in memory: its LC_UUID identifies the build and the architecture.
+[plugin]
+
+# RVAs in game_plugin of the (begin, end) pointer pairs of the entity arrays.
+[arrays]
+players = 0x5D031E8
+staff = 0x5D03230
+clubs = 0x5D033A0

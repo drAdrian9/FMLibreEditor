@@ -1,0 +1,30 @@
+# FM27 27.0.1 on Steam (app 4530370, build 26385295), the update of the full release on 10 November 2026. Worked out
+# by `fmlibre-probe profile` on a save of 16 August 2026, where all 10 checks passed. Every static of the game plugin
+# sits 0x11B040 further than in build 26340721, at the same distances from each other. The object layout is
+# unchanged: the same save read the same before and after the update, field by field.
+name = "FM27 Steam build 26385295 (27.0.1)"
+edition = 27
+storefront = "steam"
+
+# The in-game date, 2026-08-16 on the save: 3578 of 3578 contract dates
+# before it, and 120 of 120 current injuries begun by then and not over.
+current_date = 0x57CA3B8
+
+# The static pointer to the retirement manager (RETIREMENT_MANAGER),
+# 0xDAC0 before the players pair; 29 planned retirements on the save.
+retirement_manager = 0x5812D50
+
+# The static pointer to the game's one GAME_UI object, whose count of saves loaded tells a load from a save: 0x3C80
+# before the players pair, as in build 26340721, where the guess from that build's distance found it (1 loaded on the
+# save of 17 August 2026). Another static, at 0x580EBB8, points at it too.
+
+# game_plugin as mapped in memory; these values identify the build.
+[plugin]
+size_of_image = 0x17CB9000
+link_timestamp = 0x6AE8B5A4
+
+# RVAs in game_plugin of the (begin, end) pointer pairs of the entity arrays.
+[arrays]
+players = 0x5820810
+staff = 0x5820858
+clubs = 0x58209C8

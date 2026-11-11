@@ -1,0 +1,29 @@
+# FM27 27.0.1 on Steam for macOS (app 4530370, build 26385295): the arm64 half of the universal game_plugin, which
+# Apple silicon Macs run natively. Worked out by `fmlibre-probe profile` on a running save (12 July 2027), as for a
+# build without a profile, and every check passed. The variables moved with __DATA, 0x9C000 on from 27.0.0's; the
+# arrays 0x38 more.
+name = "FM27 Steam build 26385295 (27.0.1, macOS, Apple silicon)"
+edition = 27
+storefront = "steam"
+
+# The in-game date, a variable of its own: 12 July 2027 on the save, the one value of the 25 in the plugin's writable
+# data that read as a date which the contracts (none of 3,438 signed after it) and the current injuries (67 of 67) fit.
+current_date = 0x574DDB8
+
+# The static pointer to the retirement manager (RETIREMENT_MANAGER), found by searching: 894 planned retirements on
+# the save.
+retirement_manager = 0x57442A8
+
+# A static pointer to the game's own object (game_plugin::GAME_UI), whose count of saves loaded tells a load from a
+# save: 1 on the save, loaded once since the game started. A second static, game_plugin+0x57708F0, points at it too;
+# this one, among other singletons' (the multiplayer manager's, the match coordinator's), is the one a search finds
+# first.
+
+# game_plugin as mapped in memory: its LC_UUID identifies the build and the architecture.
+[plugin]
+
+# RVAs in game_plugin of the (begin, end) pointer pairs of the entity arrays, as calibrate found them by scanning.
+[arrays]
+players = 0x576EE50
+staff = 0x576EE98
+clubs = 0x576F008
