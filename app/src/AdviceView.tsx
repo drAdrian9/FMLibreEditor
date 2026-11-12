@@ -55,7 +55,16 @@ const openOnKey = (open: () => void) => (event: KeyboardEvent) => {
   }
 };
 
-export function AdviceView({ version, active }: { version: number; active: boolean }) {
+export function AdviceView({
+  version,
+  active,
+  onScout,
+}: {
+  version: number;
+  active: boolean;
+  /** Opens the Scouting for a position (a key of POSITIONS). */
+  onScout?: (position: string) => void;
+}) {
   const [humanClubs, setHumanClubs] = useState<{ uid: number; name: string }[]>([]);
   const [club, setClub] = useState<number | null>(null);
   const [team, setTeam] = useState(0);
@@ -250,7 +259,7 @@ export function AdviceView({ version, active }: { version: number; active: boole
                       />
                     ))}
                   </ul>
-                  {shownRole && <RoleDetail role={shownRole} onOpen={setShownPlayer} />}
+                  {shownRole && <RoleDetail role={shownRole} onOpen={setShownPlayer} onScout={onScout} />}
                 </>
               ) : (
                 <>
@@ -380,12 +389,30 @@ function ClubCell({ uid, name }: { uid: number | null; name: string | null }) {
   );
 }
 
-function RoleDetail({ role, onOpen }: { role: RoleAdvice; onOpen: (player: PlayerSummary) => void }) {
+function RoleDetail({
+  role,
+  onOpen,
+  onScout,
+}: {
+  role: RoleAdvice;
+  onOpen: (player: PlayerSummary) => void;
+  onScout?: (position: string) => void;
+}) {
   const c = text.columns;
   return (
     <div className="advice-detail">
       <h3>
         {text.roles[role.key] ?? role.key} <NeedBadge need={role.need} title={text.needTitles[role.need]} />
+        {onScout && (
+          <button
+            type="button"
+            className="advice-scout"
+            title={text.findInScoutingTitle}
+            onClick={() => onScout(role.positions[0])}
+          >
+            {text.findInScouting}
+          </button>
+        )}
       </h3>
 
       <h4>{text.members}</h4>

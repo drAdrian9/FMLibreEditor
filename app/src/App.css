@@ -6180,3 +6180,25 @@ button.danger:hover:not(:disabled) {
   border-color: var(--pending);
   color: var(--pending);
 }
+
+/* The Scouting tab with the Advisor in it: the switch between the two on top, each one below it. */
+.workspace.scout-hub {
+  flex-direction: column;
+}
+
+.hub-switch {
+  flex: none;
+  margin: 8px 18px 0;
+}
+
+.hub-views {
+  flex: 1;
+}
+
+/* Find in Scouting, beside a place's name in the Advisor. */
+.advice-scout {
+  margin-left: 10px;
+  padding: 2px 10px;
+  font-size: 13px;
+  vertical-align: middle;
+}

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AdviceView } from "./AdviceView";
 import { call, inTauri } from "./api";
 import { BridgeSetup } from "./BridgeSetup";
 import { ChangesView, useChangeLog } from "./ChangesView";
@@ -12,11 +11,11 @@ import { describeError, describeGame, formatDate } from "./format";
 import { FrozenNotice } from "./FrozenNotice";
 import { GraphicsStatus } from "./GraphicsStatus";
 import { SettingsMenu } from "./SettingsMenu";
-import { adviceText, appText, changesText, clubListText, playerListText, scoutingText, staffListText } from "./labels";
+import { appText, changesText, clubListText, playerListText, scoutingText, staffListText } from "./labels";
 import { PlayerBrowser } from "./PlayerBrowser";
 import { restored, useSnapshot } from "./restore";
 import { SaveChangedNotice, useSaveChanged } from "./SaveChangedNotice";
-import { ScoutingBrowser } from "./ScoutingBrowser";
+import { ScoutHub } from "./ScoutHub";
 import { StaffBrowser } from "./StaffBrowser";
 import type { BridgeInfo, ConnectionInfo, Detection, Refrozen, ReloadInfo } from "./types";
 import { useUpdateCheck } from "./update";
@@ -25,19 +24,19 @@ import { ComparisonContext, useComparison } from "./useComparison";
 import { askToLeave, EditorContext } from "./useProfileEditing";
 import "./App.css";
 
-type View = "players" | "staff" | "clubs" | "scouting" | "advice" | "changes";
+type View = "players" | "staff" | "clubs" | "scouting" | "changes";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "players", label: playerListText.nav },
   { id: "staff", label: staffListText.nav },
   { id: "clubs", label: clubListText.nav },
   { id: "scouting", label: scoutingText.nav },
-  { id: "advice", label: adviceText.nav },
   { id: "changes", label: changesText.nav },
 ];
 
 /** The view the window was in before the language was switched; the first one when there was no such switch. */
-const readView = (value: unknown): View => VIEWS.find(({ id }) => id === value)?.id ?? "players";
+const readView = (value: unknown): View =>
+  value === "advice" ? "scouting" : (VIEWS.find(({ id }) => id === value)?.id ?? "players");
 
 /** The app's mark, as on its icon: FML over FM's four bands. */
 function BrandMark() {
@@ -274,8 +273,7 @@ function App() {
                 />
                 <StaffBrowser version={dataVersion} active={view === "staff"} genderKnown={connection.genderKnown} />
                 <ClubBrowser version={dataVersion} active={view === "clubs"} />
-                <ScoutingBrowser version={dataVersion} active={view === "scouting"} />
-                <AdviceView version={dataVersion} active={view === "advice"} />
+                <ScoutHub version={dataVersion} active={view === "scouting"} />
                 {view === "changes" && <ChangesView log={log} error={logError} reload={reloadLog} onUndone={edited} />}
               </div>
             </ComparisonContext.Provider>

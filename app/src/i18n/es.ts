@@ -1479,6 +1479,8 @@ export const es: Strings = {
     members: "En tu plantilla",
     noMembers: "Nadie de tu plantilla juega aquí.",
     candidates: "Fichajes sugeridos",
+    findInScouting: "Buscar en Ojeo",
+    findInScoutingTitle: "Abre el ojeo de esta posición: fichajes según los roles de tu táctica, con traspaso, sueldo y probabilidad de que vengan",
     local: "Nacionales",
     foreign: "Extranjeros",
     team: "Equipo",

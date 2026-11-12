@@ -53,7 +53,16 @@ function readSaved(value: unknown): Saved {
   };
 }
 
-export function ScoutingBrowser({ version, active }: { version: number; active: boolean }) {
+export function ScoutingBrowser({
+  version,
+  active,
+  focus,
+}: {
+  version: number;
+  active: boolean;
+  /** A position to advise on, asked from elsewhere (the Advisor): picked, with its roles left to the advice. */
+  focus?: { position: string; nonce: number } | null;
+}) {
   const [saved] = useState(() => restored("scouting", readSaved));
   const [overview, setOverview] = useState<ScoutingOverview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,6 +71,12 @@ export function ScoutingBrowser({ version, active }: { version: number; active: 
   const [chosen, setChosen] = useState<Brief>(saved.brief);
   const [departureFilter, setDepartureFilter] = useState<DepartureFilter>(saved.departures);
   const [shown, setShown] = useState<PlayerSummary | null>(null);
+  useEffect(() => {
+    if (focus) {
+      setChosen((old) => ({ ...old, position: focus.position, inPossession: "", outOfPossession: "" }));
+      setTab("recommend");
+    }
+  }, [focus]);
   useSnapshot("scouting", () => ({ tab, brief: chosen, departures: departureFilter }));
 
   // The data version the club was read at; it is read again when the tab is shown after the data changed.

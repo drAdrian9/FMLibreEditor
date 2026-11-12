@@ -1427,6 +1427,8 @@ export const tr: Strings = {
     members: "Kadronuzda",
     noMembers: "Kadronuzda burada oynayan kimse yok.",
     candidates: "Önerilen transferler",
+    findInScouting: "Gözlemde ara",
+    findInScoutingTitle: "Bu mevki için gözlemi aç: taktiğinizin rollerine göre transferler, bonservis, maaş ve gelme olasılığıyla",
     local: "Yerli",
     foreign: "Yabancı",
     team: "Takım",

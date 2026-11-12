@@ -226,6 +226,8 @@ export const PERSIJA_ID: DeepPartial<Strings> = {
     members: "Di skuadmu",
     noMembers: "Tidak ada pemainmu yang bermain di sini.",
     candidates: "Saran rekrutan",
+    findInScouting: "Cari di Scouting",
+    findInScoutingTitle: "Buka Scouting untuk posisi ini: rekrutan sesuai role taktikmu, dengan perkiraan biaya, gaji, dan peluang mau datang",
     local: "Lokal",
     foreign: "Asing",
     team: "Tim",

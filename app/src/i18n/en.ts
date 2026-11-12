@@ -1541,6 +1541,8 @@ export const en = {
     members: "In your squad",
     noMembers: "No one in your squad plays here.",
     candidates: "Suggested signings",
+    findInScouting: "Find in Scouting",
+    findInScoutingTitle: "Open the Scouting for this position: signings by the roles of your tactic, with fee, wage and how likely they are to come",
     local: "Local",
     foreign: "Foreign",
     team: "Team",
