@@ -724,6 +724,9 @@ pub struct ClubTactic {
     pub slots: Vec<TacticSlot>,
     /// How many of the game's copies hold it: the one most copies hold is the tactic in use.
     pub copies: usize,
+    /// Where the first copy found is, for reading what is not decoded yet (team instructions).
+    #[serde(skip)]
+    pub block: u64,
 }
 
 impl Session {
@@ -809,7 +812,7 @@ impl Session {
                     }
                 })
                 .collect();
-            tactics.push((key, eleven, ClubTactic { style, slots, copies: 1 }));
+            tactics.push((key, eleven, ClubTactic { style, slots, copies: 1, block }));
         }
         if tactics.is_empty() {
             return Err(ScoutError::NoTactic { club: club.uid });

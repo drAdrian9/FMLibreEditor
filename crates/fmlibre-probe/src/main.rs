@@ -5577,7 +5577,12 @@ fn scout(
         let tactics = session.club_tactics(club, &players)?;
         println!("\n{} tactic(s) in {:.1} s", tactics.len(), started.elapsed().as_secs_f64());
         for (i, tactic) in tactics.iter().enumerate() {
-            println!("tactic {i} (style {}, {} copies)", tactic.style.as_deref().unwrap_or("?"), tactic.copies);
+            println!(
+                "tactic {i} (style {}, {} copies, block {:#x})",
+                tactic.style.as_deref().unwrap_or("?"),
+                tactic.copies,
+                tactic.block
+            );
             for s in &tactic.slots {
                 println!(
                     "  {:>2}  {:<5} {:<5} {:<5} {}",
