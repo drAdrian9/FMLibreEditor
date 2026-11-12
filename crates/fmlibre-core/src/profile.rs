@@ -919,6 +919,7 @@ const BUILDS: &[&str] = &[
     include_str!("../../../profiles/fm27/steam-26227640.toml"),
     include_str!("../../../profiles/fm27/steam-26340721.toml"),
     include_str!("../../../profiles/fm27/steam-26385295.toml"),
+    include_str!("../../../profiles/fm27/steam-26577676.toml"),
     include_str!("../../../profiles/fm27/steam-26227640-macos-x86_64.toml"),
     include_str!("../../../profiles/fm27/steam-26227640-macos-arm64.toml"),
     include_str!("../../../profiles/fm27/steam-26340721-macos-x86_64.toml"),
@@ -1274,6 +1275,7 @@ mod tests {
                 "FM27 0.9.2435.0 (Game Pass)",
                 "FM27 Steam build 26340721 (27.0.0)",
                 "FM27 Steam build 26385295 (27.0.1)",
+                "FM27 Steam build 26577676",
                 "FM27 Steam build 26385295 (27.0.1, macOS, Intel)",
                 "FM27 Steam build 26385295 (27.0.1, macOS, Apple silicon)",
             ]
