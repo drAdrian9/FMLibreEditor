@@ -61,7 +61,7 @@ export function ScoutingBrowser({
   version: number;
   active: boolean;
   /** A position to advise on, asked from elsewhere (the Advisor): picked, with its roles left to the advice. */
-  focus?: { position: string; nonce: number } | null;
+  focus?: { position: string; inPossession?: string; outOfPossession?: string; nonce: number } | null;
 }) {
   const [saved] = useState(() => restored("scouting", readSaved));
   const [overview, setOverview] = useState<ScoutingOverview | null>(null);
@@ -73,7 +73,12 @@ export function ScoutingBrowser({
   const [shown, setShown] = useState<PlayerSummary | null>(null);
   useEffect(() => {
     if (focus) {
-      setChosen((old) => ({ ...old, position: focus.position, inPossession: "", outOfPossession: "" }));
+      setChosen((old) => ({
+        ...old,
+        position: focus.position,
+        inPossession: focus.inPossession ?? "",
+        outOfPossession: focus.outOfPossession ?? "",
+      }));
       setTab("recommend");
     }
   }, [focus]);

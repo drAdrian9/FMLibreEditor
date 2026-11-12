@@ -13,7 +13,12 @@ type Mode = "advice" | "scout";
 export function ScoutHub({ version, active }: { version: number; active: boolean }) {
   const [mode, setMode] = useState<Mode>("advice");
   // The position the Advisor asked the Scouting for, with a count that tells one ask from the next.
-  const [focus, setFocus] = useState<{ position: string; nonce: number } | null>(null);
+  const [focus, setFocus] = useState<{
+    position: string;
+    inPossession?: string;
+    outOfPossession?: string;
+    nonce: number;
+  } | null>(null);
 
   const className = ["workspace", "scout-hub", !active && "inactive"].filter(Boolean).join(" ");
   return (
@@ -36,8 +41,8 @@ export function ScoutHub({ version, active }: { version: number; active: boolean
         <AdviceView
           version={version}
           active={active && mode === "advice"}
-          onScout={(position) => {
-            setFocus((old) => ({ position, nonce: (old?.nonce ?? 0) + 1 }));
+          onScout={(position, inPossession, outOfPossession) => {
+            setFocus((old) => ({ position, inPossession, outOfPossession, nonce: (old?.nonce ?? 0) + 1 }));
             setMode("scout");
           }}
         />

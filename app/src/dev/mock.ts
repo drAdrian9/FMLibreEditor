@@ -3002,8 +3002,32 @@ function clubAdvice(uid: number | null, options: AdviceOptions): ClubAdvice {
     finances: club.women ? null : clubDetails(club).finances,
     formation,
     eleven,
-    ownTactic: false,
-    tacticStyle: null,
+    ownTactic: options.useTactic === true,
+    tacticStyle: options.useTactic ? "NULL" : null,
+    // Made-up fits for the made-up tactic: the eleven's players, and the next ones of the squad as other options.
+    roleFits: options.useTactic
+      ? eleven.map((pick, index) => {
+          const roles = ["gk", "fb", "cb", "cb", "fb", "dm", "cm", "cm", "if", "if", "af"];
+          const fit = (player: PlayerSummary, base: number) => ({
+            player,
+            fit: Math.max(20, Math.min(98, base)),
+            inPossession: 14,
+            outOfPossession: 12,
+            inPossessionRole: roles[index],
+            outOfPossessionRole: roles[index],
+            positionRating: 18,
+          });
+          const others = squad.filter((p) => p.uid !== pick.player?.uid).slice(index, index + 3);
+          return {
+            index,
+            position: pick.position,
+            inPossession: roles[index],
+            outOfPossession: index === 10 ? null : roles[index],
+            picked: pick.player ? fit(pick.player, 40 + ((index * 17) % 55)) : null,
+            best: others.map((p, k) => fit(p, 60 - k * 8)),
+          };
+        })
+      : [],
     // A few of the squad, as the real command lists those not fully ready.
     readiness: squad.slice(0, 3).map((player, i) => ({
       player,

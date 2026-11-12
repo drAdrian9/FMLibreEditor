@@ -2745,19 +2745,42 @@ fn club_advice(
     // The eleven again, without those who cannot play, and in the manager's own tactic where asked and readable.
     let available: Vec<&PlayerSummary> =
         squad.iter().filter(|uid| !unavailable.contains(*uid)).filter_map(|&uid| connection.players.get(uid)).collect();
+    // The manager's own tactic, where asked and readable: each place with its position and roles. A place whose roles
+    // the editor does not know yet is placed by the position its player plays best (the goalkeeper's is the first).
     let own = if options.use_tactic && team_index == 0 {
         connection.session.club_tactics(summary, &connection.players).ok().and_then(|tactics| {
             let tactic = tactics.into_iter().next()?;
-            let positions: Vec<&'static str> = tactic.slots.iter().filter_map(|slot| slot.position).collect();
-            let shape: [&'static str; 11] = positions.try_into().ok()?;
-            Some((shape, tactic.style))
+            let places: Vec<fmlibre_core::TacticPlace> = tactic
+                .slots
+                .iter()
+                .map(|slot| {
+                    let position = slot.position.or_else(|| (slot.index == 0).then_some("gk")).or_else(|| {
+                        let player = connection.players.get(slot.player?)?;
+                        let best = (0..fmlibre_core::POSITIONS.len())
+                            .filter(|&i| fmlibre_core::POSITIONS[i] != "sw")
+                            .max_by_key(|&i| player.position_ratings[i])?;
+                        Some(fmlibre_core::POSITIONS[best])
+                    })?;
+                    Some((position, slot.in_possession, slot.out_of_possession))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            (places.len() == 11).then_some((places, tactic.style))
         })
     } else {
         None
     };
     match own {
-        Some((shape, style)) => {
-            advice.eleven = fmlibre_core::best_eleven(&available, &shape);
+        Some((places, style)) => {
+            advice.role_fits = fmlibre_core::tactic_eleven(&available, &places);
+            advice.eleven = advice
+                .role_fits
+                .iter()
+                .map(|place| fmlibre_core::XiPick {
+                    position: place.position,
+                    player: place.picked.as_ref().map(|fit| fit.player.clone()),
+                    rating: place.picked.as_ref().map_or(0, |fit| fit.position_rating),
+                })
+                .collect();
             advice.own_tactic = true;
             advice.tactic_style = style;
         }

@@ -155,6 +155,8 @@ pub struct ClubAdvice {
     /// Whether the eleven was drawn in the manager's own tactic, and its style as the game codes it (`CONT`...).
     pub own_tactic: bool,
     pub tactic_style: Option<String>,
+    /// For an eleven drawn in the manager's own tactic: each place with its roles and how the team's players fit them.
+    pub role_fits: Vec<RoleFit>,
     /// The players of the team who are not fit to play, or not happy: injured, banned, tired, short of match
     /// sharpness, low in morale or with reasons to be unhappy. The app fills it in.
     pub readiness: Vec<Readiness>,
@@ -196,6 +198,100 @@ fn place_value(player: &PlayerSummary, position: usize) -> i64 {
         10..=14 => ability * rating * 3,
         _ => ability * rating,
     }
+}
+
+/// Who of `count` members fills each of `places` places so that together they are worth the most, as `value(place,
+/// member)` says: the best pairs first, then any two places, or a place and a member left out, swapped while that is
+/// worth more. None for a place no member is left for.
+fn assign(places: usize, count: usize, value: impl Fn(usize, usize) -> i64) -> Vec<Option<usize>> {
+    let mut pairs: Vec<(i64, usize, usize)> = Vec::new();
+    for place in 0..places {
+        for who in 0..count {
+            pairs.push((value(place, who), place, who));
+        }
+    }
+    pairs.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let mut chosen: Vec<Option<usize>> = vec![None; places];
+    let mut used = vec![false; count];
+    for (_, place, who) in pairs {
+        if chosen[place].is_none() && !used[who] {
+            chosen[place] = Some(who);
+            used[who] = true;
+        }
+    }
+    let worth = |place: usize, who: Option<usize>| who.map_or(0, |w| value(place, w));
+    for _ in 0..10 {
+        let mut better = false;
+        for a in 0..places {
+            for b in a + 1..places {
+                if worth(a, chosen[b]) + worth(b, chosen[a]) > worth(a, chosen[a]) + worth(b, chosen[b]) {
+                    chosen.swap(a, b);
+                    better = true;
+                }
+            }
+            for who in 0..count {
+                if !used[who] && worth(a, Some(who)) > worth(a, chosen[a]) {
+                    if let Some(old) = chosen[a] {
+                        used[old] = false;
+                    }
+                    chosen[a] = Some(who);
+                    used[who] = true;
+                    better = true;
+                }
+            }
+        }
+        if !better {
+            break;
+        }
+    }
+    chosen
+}
+
+/// One place of the manager's tactic, and how the team's players fit its roles.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleFit {
+    /// Its place in the tactic, the goalkeeper first, and the position it is played in.
+    pub index: usize,
+    pub position: &'static str,
+    /// Its roles by key, where the editor knows them.
+    pub in_possession: Option<&'static str>,
+    pub out_of_possession: Option<&'static str>,
+    /// Who the eleven puts there, and the team's best fits for it, best first (at most four).
+    pub picked: Option<crate::Fitting>,
+    pub best: Vec<crate::Fitting>,
+}
+
+/// A place of a tactic: its position, and its roles where known.
+pub type TacticPlace = (&'static str, Option<&'static str>, Option<&'static str>);
+
+/// The eleven of `members` for the places of a tactic, by how they fit each place's roles (see
+/// [`crate::measure_fit`]), with each place's best fits.
+pub fn tactic_eleven(members: &[&PlayerSummary], places: &[TacticPlace]) -> Vec<RoleFit> {
+    let fits: Vec<Vec<Option<crate::Fitting>>> = places
+        .iter()
+        .map(|&(position, ip, oop)| members.iter().map(|p| crate::measure_fit(p, position, ip, oop)).collect())
+        .collect();
+    let chosen = assign(places.len(), members.len(), |place, who| {
+        fits[place][who].as_ref().map_or(0, |f| i64::from(f.fit) * 1000 + i64::from(f.player.current_ability))
+    });
+    places
+        .iter()
+        .enumerate()
+        .map(|(index, &(position, ip, oop))| {
+            let mut best: Vec<crate::Fitting> = fits[index].iter().flatten().cloned().collect();
+            best.sort_by_key(|f| (Reverse(f.fit), Reverse(f.player.current_ability)));
+            best.truncate(4);
+            RoleFit {
+                index,
+                position,
+                in_possession: ip,
+                out_of_possession: oop,
+                picked: chosen[index].and_then(|who| fits[index][who].clone()),
+                best,
+            }
+        })
+        .collect()
 }
 
 /// The best eleven of `members` in `formation`: each player in at most one place, chosen so that the eleven together
@@ -857,6 +953,7 @@ pub fn advise(
         eleven,
         own_tactic: false,
         tactic_style: None,
+        role_fits: Vec::new(),
         readiness: Vec::new(),
         team: options.team,
         teams: Vec::new(),

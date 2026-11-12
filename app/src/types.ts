@@ -1275,6 +1275,17 @@ export interface AdviceOptions {
   useTactic?: boolean;
 }
 
+/** One place of the manager's tactic and how the team's players fit its roles (see `club_advice`). */
+export interface RoleFit {
+  index: number;
+  position: string;
+  inPossession: string | null;
+  outOfPossession: string | null;
+  picked: Fitting | null;
+  /** The team's best fits for it, best first. */
+  best: Fitting[];
+}
+
 /** A player of the team who is not fully ready, and why (see `club_advice`). */
 export interface Readiness {
   player: PlayerSummary;
@@ -1407,5 +1418,7 @@ export interface ClubAdvice {
   tacticStyle: string | null;
   /** The players not fully ready: injured, banned, tired, unsharp, jaded, low in morale or unhappy. */
   readiness: Readiness[];
+  /** For an eleven in the manager's own tactic: each place with its roles and the team's best fits. */
+  roleFits: RoleFit[];
   staff: StaffAdvice[];
 }

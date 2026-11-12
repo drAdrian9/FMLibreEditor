@@ -1111,6 +1111,20 @@ impl Measure {
     }
 }
 
+/// How `player` measures up to `position` (a key of [`SCOUT_POSITIONS`]) in the roles given by key, or, for a phase
+/// with none, in the role of the position that suits him best: the scouting's own measure, for a squad's player as for
+/// one it recommends. None for a position or role it does not know.
+pub fn measure_fit(player: &PlayerSummary, position: &str, ip: Option<&str>, oop: Option<&str>) -> Option<Fitting> {
+    let request = ScoutRequest {
+        position: position.to_owned(),
+        in_possession: ip.map(str::to_owned),
+        out_of_possession: oop.map(str::to_owned),
+        ..ScoutRequest::default()
+    };
+    let measure = Measure::new(&request).ok()?;
+    measure.of(player).map(|m| fitting(player, m))
+}
+
 fn fitting(player: &PlayerSummary, m: Measured) -> Fitting {
     Fitting {
         player: player.clone(),

@@ -48,8 +48,8 @@ mod transfer;
 
 pub use advice::{
     AdviceOptions, Candidate, ClubAdvice, Disposition, FORMATIONS, INTEREST_POOL, Interest, JADED, LOW_MORALE, Need,
-    Readiness, RoleAdvice, RoleMember, StaffAdvice, StaffPick, TIRED, Tag, TeamChoice, UNSHARP, XiPick, advise,
-    best_eleven, home_nation, judge, refine,
+    Readiness, RoleAdvice, RoleFit, RoleMember, StaffAdvice, StaffPick, TIRED, TacticPlace, Tag, TeamChoice, UNSHARP,
+    XiPick, advise, best_eleven, home_nation, judge, refine, tactic_eleven,
 };
 pub use calibrate::{ArrayRef, EntityArrays, calibrate};
 pub use clauses::{
@@ -98,8 +98,8 @@ pub use retirement::{PlannedRetirement, RetirementPlan, RetirementSet};
 pub use scan::{ArrayCandidate, ScanOptions, VtableCount, scan_object_arrays};
 pub use scouting::{
     Buyer, ClubTactic, Fitting, LIKELY, Line, NOT_FOR_SALE, Phase, Purpose, ROLES, Reason, Role, SCOUT_POSITIONS,
-    ScoutError, ScoutOrder, ScoutPosition, ScoutRequest, Scouted, Side, Suggestion, TacticSlot, role, role_of_mask,
-    scout_position,
+    ScoutError, ScoutOrder, ScoutPosition, ScoutRequest, Scouted, Side, Suggestion, TacticSlot, measure_fit, role,
+    role_of_mask, scout_position,
 };
 pub use session::{ArraySource, IGNORE_PROFILES, SaveVouched, Session, SessionError, find_game, profiles_ignored};
 pub use signing::NewContract;

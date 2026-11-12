@@ -10,6 +10,7 @@ import { adviceText as text, jobLabel, positionLabel, profileText, STAFF_ATTRIBU
 import { ClubLogo, PICTURE_SIZE, WithPicture } from "./Picture";
 import { PlayerDialog } from "./PlayerProfile";
 import { tierClass } from "./ProfileParts";
+import { roleAbbreviation, roleName } from "./ScoutParts";
 import { StaffDialog } from "./StaffProfile";
 import type {
   AdviceOptions,
@@ -17,6 +18,7 @@ import type {
   Candidate,
   ClubAdvice,
   Readiness,
+  RoleFit,
   ClubPage,
   Need,
   PlayerSummary,
@@ -62,8 +64,8 @@ export function AdviceView({
 }: {
   version: number;
   active: boolean;
-  /** Opens the Scouting for a position (a key of POSITIONS). */
-  onScout?: (position: string) => void;
+  /** Opens the Scouting for a position (a key of POSITIONS), in the roles given if any. */
+  onScout?: (position: string, inPossession?: string, outOfPossession?: string) => void;
 }) {
   const [humanClubs, setHumanClubs] = useState<{ uid: number; name: string }[]>([]);
   const [club, setClub] = useState<number | null>(null);
@@ -235,6 +237,7 @@ export function AdviceView({
                   useTactic={useTactic}
                   onUseTactic={setUseTactic}
                   onOpen={setShownPlayer}
+                  onScout={onScout}
                 />
               ) : section === "readiness" ? (
                 <ReadinessList rows={advice.readiness} onOpen={setShownPlayer} />
@@ -686,6 +689,7 @@ function Eleven({
   useTactic,
   onUseTactic,
   onOpen,
+  onScout,
 }: {
   advice: ClubAdvice;
   formation: string;
@@ -693,8 +697,10 @@ function Eleven({
   useTactic: boolean;
   onUseTactic: (on: boolean) => void;
   onOpen: (player: PlayerSummary) => void;
+  onScout?: (position: string, inPossession?: string, outOfPossession?: string) => void;
 }) {
   const picks = advice.eleven.map((pick, index) => ({ ...pick, index }));
+  const fitOf = (index: number) => advice.roleFits.find((place) => place.index === index);
   const lines = [...new Set(picks.map((pick) => lineOf(pick.position)))].sort((a, b) => a - b);
   const placed = picks.filter((pick) => pick.player !== null);
   const average = placed.length > 0 ? Math.round(placed.reduce((sum, p) => sum + p.player!.currentAbility, 0) / placed.length) : null;
@@ -719,7 +725,7 @@ function Eleven({
       </div>
       {useTactic && (
         <p className={advice.ownTactic ? "view-note" : "view-note error"}>
-          {advice.ownTactic ? text.eleven.ownTactic(advice.tacticStyle) : text.eleven.noTactic}
+          {advice.ownTactic ? text.eleven.ownTactic(advice.tacticStyle === "NULL" ? null : advice.tacticStyle) : text.eleven.noTactic}
         </p>
       )}
       {advice.readiness.some((r) => r.injuries.length > 0 || r.bans.length > 0) && (
@@ -732,7 +738,8 @@ function Eleven({
           )}
         </p>
       )}
-      <p className="view-note">{text.eleven.note}</p>
+      {advice.roleFits.length === 0 && <p className="view-note">{text.eleven.note}</p>}
+      {advice.roleFits.length > 0 && <p className="view-note">{text.roleFit.note}</p>}
       <div className="eleven-pitch">
         {lines.map((line) => (
           <div key={line} className="eleven-line">
@@ -748,12 +755,21 @@ function Eleven({
                   </div>
                 ) : (
                   <button key={pick.index} type="button" className="eleven-card" onClick={() => onOpen(player)}>
-                    <span className="eleven-pos">{positionLabel(pick.position)}</span>
+                    <span className="eleven-pos">
+                      {positionLabel(pick.position)}
+                      {fitOf(pick.index) && ` · ${roleText(fitOf(pick.index)!)}`}
+                    </span>
                     <span className="eleven-name">{player.name}</span>
                     <span className="eleven-facts">
-                      <span className={`value ${tierClass(pick.rating)}`} title={text.columns.ratingTitle}>
-                        {pick.rating}
-                      </span>
+                      {fitOf(pick.index)?.picked ? (
+                        <span className={`value ${fitClass(fitOf(pick.index)!.picked!.fit)}`} title={text.roleFit.fitTitle}>
+                          {fitOf(pick.index)!.picked!.fit}%
+                        </span>
+                      ) : (
+                        <span className={`value ${tierClass(pick.rating)}`} title={text.columns.ratingTitle}>
+                          {pick.rating}
+                        </span>
+                      )}
                       <Ability value={player.currentAbility} />
                       <span className="muted">{player.age ?? ""}</span>
                     </span>
@@ -763,6 +779,7 @@ function Eleven({
           </div>
         ))}
       </div>
+      {advice.roleFits.length > 0 && <RoleFitTable places={advice.roleFits} onOpen={onOpen} onScout={onScout} />}
     </div>
   );
 }
@@ -834,6 +851,98 @@ function ReadinessList({ rows, onOpen }: { rows: Readiness[]; onOpen: (player: P
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+/** A place's roles, short: "IF / W", or "AM" where both are one. */
+function roleText(place: RoleFit): string {
+  const ip = place.inPossession ?? place.picked?.inPossessionRole ?? null;
+  const oop = place.outOfPossession ?? place.picked?.outOfPossessionRole ?? null;
+  const parts = [ip, oop].filter((key): key is string => key !== null).map(roleAbbreviation);
+  return [...new Set(parts)].join(" / ");
+}
+
+/** A fit's tier, for its colour: 75 and up good, 55 and up fair, below that weak. */
+const fitClass = (fit: number) => (fit >= 75 ? "tier-4" : fit >= 55 ? "tier-3" : fit >= 35 ? "tier-2" : "tier-1");
+
+/** Below this fit the place counts as weak, and the Scouting is offered for it. */
+const WEAK_FIT = 55;
+
+/** Each place of the tactic: its roles, who plays it and how well, and the team's other fits for it. */
+function RoleFitTable({
+  places,
+  onOpen,
+  onScout,
+}: {
+  places: RoleFit[];
+  onOpen: (player: PlayerSummary) => void;
+  onScout?: (position: string, inPossession?: string, outOfPossession?: string) => void;
+}) {
+  const t = text.roleFit;
+  return (
+    <div className="role-fits">
+      <h4>{t.title}</h4>
+      <table className="grid advice-grid">
+        <thead>
+          <tr>
+            <th>{t.place}</th>
+            <th>{t.roles}</th>
+            <th>{t.picked}</th>
+            <th className="num">{t.fit}</th>
+            <th>{t.others}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {places.map((place) => {
+            const picked = place.picked;
+            const others = place.best.filter((fit) => fit.player.uid !== picked?.player.uid).slice(0, 3);
+            const weak = !picked || picked.fit < WEAK_FIT;
+            return (
+              <tr key={place.index}>
+                <td>{positionLabel(place.position)}</td>
+                <td title={[place.inPossession, place.outOfPossession].filter(Boolean).map((k) => roleName(k!)).join(" / ")}>
+                  {roleText(place) || "?"}
+                </td>
+                <td className="col-name">
+                  {picked ? (
+                    <button type="button" className="link-button" onClick={() => onOpen(picked.player)}>
+                      {picked.player.name}
+                    </button>
+                  ) : (
+                    <span className="muted">{text.eleven.nobody}</span>
+                  )}
+                </td>
+                <td className={`num value ${picked ? fitClass(picked.fit) : ""}`}>{picked ? `${picked.fit}%` : "–"}</td>
+                <td>
+                  <span className="readiness-chips">
+                    {others.map((fit) => (
+                      <button key={fit.player.uid} type="button" className="fit-chip" onClick={() => onOpen(fit.player)}>
+                        {fit.player.name} <b>{fit.fit}%</b>
+                      </button>
+                    ))}
+                  </span>
+                </td>
+                <td>
+                  {weak && onScout && (
+                    <button
+                      type="button"
+                      className="advice-scout"
+                      title={text.findInScoutingTitle}
+                      onClick={() =>
+                        onScout(place.position, place.inPossession ?? undefined, place.outOfPossession ?? undefined)
+                      }
+                    >
+                      {text.findInScouting}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

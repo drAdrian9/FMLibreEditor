@@ -7103,6 +7103,40 @@ fn advice(session: &Session, club: Option<u32>, strict: bool) -> Result<()> {
     let mut advice = advise(summary, &squad, None, &players, &staff, &clubs, &human, session.game_date(), &wide);
     advice.finances = session.club_details(summary).ok().flatten().and_then(|details| details.finances);
     refine(&mut advice, |player| session.player_details(player).ok().flatten(), &options);
+    // The eleven by role fit for the tactic the manager plays.
+    if let Ok(tactics) = session.club_tactics(summary, &players) {
+        if let Some(tactic) = tactics.first() {
+            let places: Vec<fmlibre_core::TacticPlace> = tactic
+                .slots
+                .iter()
+                .filter_map(|slot| {
+                    let position = slot.position.or_else(|| (slot.index == 0).then_some("gk")).or_else(|| {
+                        let player = players.get(slot.player?)?;
+                        let best = (0..fmlibre_core::POSITIONS.len())
+                            .filter(|&i| fmlibre_core::POSITIONS[i] != "sw")
+                            .max_by_key(|&i| player.position_ratings[i])?;
+                        Some(fmlibre_core::POSITIONS[best])
+                    })?;
+                    Some((position, slot.in_possession, slot.out_of_possession))
+                })
+                .collect();
+            let members: Vec<&fmlibre_core::PlayerSummary> = squad.iter().filter_map(|&uid| players.get(uid)).collect();
+            println!("eleven by role fit ({} places):", places.len());
+            for place in fmlibre_core::tactic_eleven(&members, &places) {
+                let best: Vec<String> =
+                    place.best.iter().map(|f| format!("{} {}", f.player.name, f.fit)).collect();
+                println!(
+                    "  {:>4} {:<5} {:<5}  {:<24} {:>3}   best: {}",
+                    place.position,
+                    place.in_possession.unwrap_or("?"),
+                    place.out_of_possession.unwrap_or("?"),
+                    place.picked.as_ref().map_or("-".to_owned(), |f| f.player.name.clone()),
+                    place.picked.as_ref().map_or(0, |f| f.fit),
+                    best.join(", ")
+                );
+            }
+        }
+    }
     println!(
         "{} (reputation {}): {} players, best XI level {}",
         summary.name,

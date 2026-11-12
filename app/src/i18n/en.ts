@@ -1542,6 +1542,17 @@ export const en = {
     noMembers: "No one in your squad plays here.",
     candidates: "Suggested signings",
     findInScouting: "Find in Scouting",
+    /** The eleven by how players fit the roles of the manager's own tactic. */
+    roleFit: {
+      note: "Picked by how each player fits the roles of your tactic (0–100%): his key attributes for the role, less where the position is new to him.",
+      fitTitle: "How he fits the place's roles, 0–100%",
+      title: "Role fit",
+      place: "Place",
+      roles: "Roles",
+      picked: "In the eleven",
+      fit: "Fit",
+      others: "Other options",
+    },
     findInScoutingTitle: "Open the Scouting for this position: signings by the roles of your tactic, with fee, wage and how likely they are to come",
     local: "Local",
     foreign: "Foreign",
