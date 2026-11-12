@@ -172,6 +172,38 @@ pub struct StaffChange {
     patches: Vec<Patch>,
 }
 
+/// What is left of a member of staff's contract, which ending it early costs his club: his wage for every week until it
+/// expires. A contract without an end date, or one the game has not dated, has nothing left to pay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Severance {
+    /// Pounds per week.
+    pub wage: i32,
+    pub expires: Option<FmDate>,
+    /// Whole weeks from today until it expires, rounded up; 0 when it has none or the date is unknown.
+    pub weeks_left: i64,
+    /// `wage` times `weeks_left`, in pounds.
+    pub remaining: i64,
+}
+
+impl Severance {
+    fn new(wage: i32, expires: Option<FmDate>, today: Option<FmDate>) -> Self {
+        let weeks_left = match (expires, today) {
+            (Some(expires), Some(today)) if expires > today => (days_between(today, expires) + 6) / 7,
+            _ => 0,
+        };
+        let wage = wage.max(0);
+        Severance { wage, expires, weeks_left, remaining: i64::from(wage) * weeks_left }
+    }
+}
+
+/// Days from `from` to `to`.
+fn days_between(from: FmDate, to: FmDate) -> i64 {
+    let year_length = |year: u16| if crate::date::is_leap(year) { 366 } else { 365 };
+    let years: i64 = (from.year..to.year).map(year_length).sum();
+    years + i64::from(to.day_of_year()) - i64::from(from.day_of_year())
+}
+
 /// What ties a member of staff to his club, checked.
 struct Holder {
     object: u64,
@@ -350,6 +382,22 @@ impl Session {
         job: u8,
         terms: MoveTerms,
     ) -> Result<StaffPlan, MoveError> {
+        self.plan_staff_signing_for(member, club, job, terms, 0)
+    }
+
+    /// [`Session::plan_staff_signing`] for the club's team `team` (its place in the club's list of teams; 0 is the
+    /// senior team): an academy's staff, the under-21s' or the under-18s' coach or sports scientist, are in the
+    /// club's departments as the senior team's are, and only their contract tells them apart, by naming that team
+    /// as their employer (Persija's under-21s fitness coach and under-18s coach, Steam build, 8 November 2026). A
+    /// director of football and a manager work for the senior team only.
+    pub fn plan_staff_signing_for(
+        &self,
+        member: &StaffSummary,
+        club: &ClubSummary,
+        job: u8,
+        terms: MoveTerms,
+        team: usize,
+    ) -> Result<StaffPlan, MoveError> {
         let (process, layout) = (&self.process, &self.layout);
         let s = &layout.staff;
         let (Some(size), Some(pools)) = (layout.contract.size, layout.pool.as_ref()) else {
@@ -373,16 +421,41 @@ impl Session {
         }
         let senior = self.joining_club(club, None)?;
         let post = self.post(job)?;
+        let employer = if team == 0 {
+            senior
+        } else {
+            if post == Post::DirectorOfFootball {
+                return Err(MoveError::NoTeam { index: team });
+            }
+            let teams = PointerList::read(process, club.address + layout.club.teams)?
+                .ok_or(MoveError::NoTeam { index: team })?;
+            let found = teams.elements(process)?.get(team).copied().unwrap_or(0);
+            if !is_user_pointer(found) || process.read_u64(found + layout.team.club)? != club.address {
+                return Err(MoveError::NoTeam { index: team });
+            }
+            found
+        };
         // Where he joins first: a club's place for a director of football that is taken refuses him before the pool
         // is looked at.
         let (mut joining, mut grow) = (Patches::default(), Vec::new());
-        self.join_post(club.address, post, object, &mut joining, &mut grow)?;
+        if post == Post::Manager && employer != senior {
+            // An academy team's manager is in the club's coaching staff, as a senior team's is not, and in his team's
+            // place for a manager (Arsenal's under-21s and under-18s managers, Steam build, 8 November 2026).
+            let offset = layout.team.manager.ok_or(MoveError::UnusualJob { job })?;
+            match process.read_u64(employer + offset)? {
+                0 => patches_push(&mut joining, employer + offset, object),
+                held => return Err(MoveError::ManagerTaken { uid: self.staff_uid(held) }),
+            }
+            self.join_post(club.address, Post::Department(Department::Coaching), object, &mut joining, &mut grow)?;
+        } else {
+            self.join_post(club.address, post, object, &mut joining, &mut grow)?;
+        }
 
         let model = self.staff_model_contract(club.address, senior, member, job, post)?;
         let pool = self.pool_holding(model, size)?;
         let taken = pool.take(process, pools)?;
         let model = process.read_bytes(model, size as usize)?;
-        let contract = self.new_staff_contract(model, object, senior, job, terms, today);
+        let contract = self.new_staff_contract(model, object, employer, senior, job, terms, today);
         let c = &layout.contract;
         let field = |offset: u64, kind: Kind| kind.decode(&contract[offset as usize..offset as usize + 4]);
         let made = NewStaffContract { wage: field(c.wage, Kind::I32), expires: field(c.expires, Kind::Date) };
@@ -402,6 +475,37 @@ impl Session {
             patches: patches.0,
             grow,
         })
+    }
+
+    /// Works out releasing `member` from his club: he leaves every place at it that holds him (its department lists,
+    /// and its place for a director of football or a team's for a manager), and has no contract after, as the game's
+    /// own staff without a club have. His contract is left as it was: nothing else in the game points at it. With the
+    /// plan comes what is left of his contract. Nothing is written.
+    pub fn plan_staff_release(&self, member: &StaffSummary) -> Result<(StaffPlan, Severance), MoveError> {
+        let holder = self.staff_holder(member)?;
+        let c = &self.layout.contract;
+        let mut patches = Patches::default();
+        self.leave_all(&holder, &mut patches)?;
+        // Only once nothing at the club holds him: the game may follow a member of a department to his contract.
+        let at = holder.object + self.layout.staff.contract;
+        patches.push(at, holder.contract.to_le_bytes(), 0u64.to_le_bytes());
+
+        // A basic contract (one without dates) may not reach the wage or the end date: nothing is owed on it then.
+        let field = |offset: u64| holder.record.get(offset as usize..offset as usize + 4);
+        let wage = field(c.wage).map_or(0, |b| i32::from_le_bytes(b.try_into().expect("4 bytes")));
+        let expires = field(c.expires).and_then(|b| FmDate::from_number(Kind::Date.decode(b)));
+        let severance = Severance::new(wage, expires, self.game_date());
+        let plan = StaffPlan {
+            member: member.uid,
+            from_club: holder.club_uid,
+            to_club: 0,
+            job: (holder.job, holder.job),
+            grows: false,
+            contract: None,
+            patches: patches.0,
+            grow: Vec::new(),
+        };
+        Ok((plan, severance))
     }
 
     /// Writes a plan, each write over the bytes it expects, after checking them all. A department list to grow gets
@@ -788,10 +892,12 @@ impl Session {
 
     /// The bytes of a new contract for the member of staff `object` with the senior team `senior` as `job`, on
     /// `terms`, made from `model`'s (see [`Session::plan_staff_signing`]).
+    #[allow(clippy::too_many_arguments)]
     fn new_staff_contract(
         &self,
         model: Vec<u8>,
         object: u64,
+        employer: u64,
         senior: u64,
         job: u8,
         terms: MoveTerms,
@@ -802,7 +908,7 @@ impl Session {
         let mut bytes = model.clone();
         let mut put = |offset: u64, value: &[u8]| bytes[at(offset, value.len())].copy_from_slice(value);
         put(c.owner, &(object + s.identity()).to_le_bytes());
-        put(c.team, &senior.to_le_bytes());
+        put(c.team, &employer.to_le_bytes());
         put(c.senior_team, &senior.to_le_bytes());
         put(c.job, &[job]);
         // The dates keep the flags the model's have.
@@ -830,6 +936,21 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn what_is_left_of_a_contract_is_its_wage_for_each_week_to_go() {
+        let date = |year, month, day| Some(FmDate { year, month, day });
+        let left = Severance::new(1_000, date(2027, 6, 30), date(2026, 11, 7));
+        assert_eq!(left.weeks_left, 34, "235 days, rounded up to whole weeks");
+        assert_eq!(left.remaining, 34_000);
+        assert_eq!(Severance::new(1_000, date(2028, 1, 1), date(2027, 12, 31)).weeks_left, 1);
+        assert_eq!(Severance::new(1_000, date(2026, 1, 1), date(2026, 11, 7)).remaining, 0, "already over");
+        assert_eq!(Severance::new(1_000, None, date(2026, 11, 7)).remaining, 0, "no end date");
+        assert_eq!(
+            days_between(FmDate { year: 2027, month: 12, day: 31 }, FmDate { year: 2028, month: 12, day: 31 }),
+            366
+        );
+    }
 
     #[test]
     fn every_job_has_one_post_and_none_is_a_player_coach() {
@@ -872,4 +993,9 @@ mod tests {
         let at = layout.club.director_of_football.expect("placed on Windows");
         assert!(at + 8 <= CLUB_BYTES as u64, "check_unheld must skip it, not miss it");
     }
+}
+
+/// Puts `object` in the empty pointer place at `at`.
+fn patches_push(patches: &mut Patches, at: u64, object: u64) {
+    patches.push(at, 0u64.to_le_bytes(), object.to_le_bytes());
 }

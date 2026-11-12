@@ -265,6 +265,8 @@ export interface StaffSummary {
   age: number | null;
   nation: string | null;
   /** The nation's UID, for its flag (see pictures.ts). */
+  /** When the contract ends; null without one. */
+  contractExpires?: FmDate | null;
   nationUid: number | null;
   /** The employer. */
   club: string | null;
@@ -382,6 +384,18 @@ export interface PlayerFilter extends PersonFilter {
   /** Only players their club has put on the transfer list, and on the loan list. */
   transferListed?: boolean;
   loanListed?: boolean;
+  maxCurrentAbility?: number;
+  maxPotentialAbility?: number;
+  /** Bounds on the wage, in pounds a week, and on the asking price, in pounds: those without one match none. */
+  minWage?: number;
+  maxWage?: number;
+  minAskingPrice?: number;
+  maxAskingPrice?: number;
+  /** Bounds on the transfer value, in pounds. */
+  minValue?: number;
+  maxValue?: number;
+  /** Leaves out the players whose nation's name has this in it: a club's foreign players are those not of its own. */
+  excludeNation?: string;
 }
 
 export type PlayerSort =
@@ -494,6 +508,8 @@ export interface PlayerDetails extends PlayerSummary {
   heightCm: number;
   /** Pounds; null when the club has not set one. */
   askingPrice: number | null;
+  /** The transfer value the game works out, in pounds; null where it is not known. */
+  value: number | null;
   reputation: Reputation;
   international: International;
   /** gk, sw, dl, dc, dr, dm, ml, mc, mr, aml, amc, amr, st, wbl, wbr → 1–20 */
@@ -719,6 +735,8 @@ export interface LoggedChange {
     released?: string;
     /** The fee the buying club paid the selling one, in pounds, if any. */
     fee?: number;
+    /** For a member of staff released: how his contract was ended, and what his club paid him, in pounds. */
+    ending?: { kind: StaffEndingKind; paid: number };
   };
   /**
    * Set for a change to a player's ties, which is logged as a change of his field `tie.nationality`,
@@ -897,6 +915,28 @@ export interface NewContract {
 export interface Amounts {
   before: number;
   after: number;
+}
+
+/** How a member of staff's contract is ended: the club alone, paying what is left of it, or by mutual consent. */
+export type StaffEndingKind = "terminate" | "mutual";
+
+/** What is left of a member of staff's contract, which ending it early costs his club. */
+export interface Severance {
+  /** Pounds per week. */
+  wage: number;
+  expires: FmDate | null;
+  /** Whole weeks until it expires, rounded up; 0 when it has no end date or it is unknown. */
+  weeksLeft: number;
+  /** `wage` times `weeksLeft`, in pounds. */
+  remaining: number;
+}
+
+/** What releasing a member of staff comes to: his club, what is left of his contract, and the club's balance. */
+export interface StaffReleasePreview {
+  club: { uid: number; name: string };
+  severance: Severance;
+  /** The club's balance before and after the payment; null where the game keeps no full finances for the club. */
+  balance: Amounts | null;
 }
 
 /** What a fee does to one club's money. */
@@ -1211,4 +1251,161 @@ export interface Scouted {
   examined: number;
   candidates: number;
   eligible: number;
+}
+
+/** How badly a place or a staff job wants someone, least first (see `club_advice`). */
+export type Need = "covered" | "thin" | "weak" | "short";
+
+/** Why a suggestion is a good one beyond its ability. */
+export type AdviceTag = "freeAgent" | "transferListed" | "loanListed" | "expiring" | "prospect";
+
+/** How the advice is drawn. */
+export interface AdviceOptions {
+  maxAge: number;
+  /** Only free agents and the players and staff of clubs a club of this reputation can sign from. */
+  realistic: boolean;
+  /** Leave out the players unlikely to want to come. */
+  interested: boolean;
+  perRole: number;
+  /** Which of the club's teams, by its place in the club's list: 0 is the senior team. */
+  team?: number;
+  /** The formation of the suggested eleven, e.g. "4-3-3". */
+  formation?: string;
+  /** Draw the eleven in the formation of the manager's own tactic, where it can be read. */
+  useTactic?: boolean;
+}
+
+/** A player of the team who is not fully ready, and why (see `club_advice`). */
+export interface Readiness {
+  player: PlayerSummary;
+  injuries: Injury[];
+  bans: Ban[];
+  /** 0–10000 (100.00%). */
+  condition: number;
+  matchSharpness: number;
+  /** -500 rested; higher is more worn out. */
+  jadedness: number;
+  /** 1–20. */
+  morale: number;
+  happiness: number | null;
+  /** How many of his reasons to be unhappy last. */
+  concerns: number;
+}
+
+/** One place of the suggested eleven: the position it is played in, and who plays it (none where no one is left). */
+export interface XiPick {
+  position: string;
+  player: PlayerSummary | null;
+  /** His rating in the position, 1–20. */
+  rating: number;
+}
+
+/** One of a club's teams the advice can be drawn for. */
+export interface TeamChoice {
+  index: number;
+  kind: number;
+  ageLimit: number | null;
+  players: number;
+}
+
+/** A player of the squad who can play a place, with his rating there; `main` when it is the place he plays best. */
+export interface RoleMember {
+  player: PlayerSummary;
+  rating: number;
+  main: boolean;
+}
+
+/** A player of another club, or none, who would fill a place. */
+export interface Candidate {
+  player: PlayerSummary;
+  rating: number;
+  /** His current ability less that of the best player of the squad at the place. */
+  gain: number;
+  clubReputation: number | null;
+  tags: AdviceTag[];
+  /** Pounds; null for a free agent or where it is not set. */
+  askingPrice: number | null;
+  /** How likely he is to want to come, as the editor estimates it; null where his profile could not be read. */
+  interest: Interest | null;
+  /** What speaks for his coming, and what against it. */
+  pros: InterestReason[];
+  cons: InterestReason[];
+  /** Whether he is of the club's country: the advice lists local and foreign players apart. */
+  domestic: boolean;
+}
+
+export type Interest = "unlikely" | "maybe" | "likely";
+
+export type InterestReason =
+  | "tooBig"
+  | "stepUp"
+  | "stepDown"
+  | "ambitious"
+  | "loyal"
+  | "unhappy"
+  | "listed"
+  | "freeAgent"
+  | "expiring"
+  | "starter"
+  | "backup"
+  | "veteran"
+  | "domestic"
+  | "wage"
+  | "fee";
+
+/** One place in the team: who covers it, how well, and who would cover it better. */
+export interface RoleAdvice {
+  key: string;
+  positions: string[];
+  wanted: number;
+  cover: number;
+  need: Need;
+  bestAbility: number | null;
+  targetAbility: number;
+  members: RoleMember[];
+  candidates: Candidate[];
+}
+
+/** A member of staff and how good they are at a job: `score` is the average of its attributes ×10. */
+export interface StaffPick {
+  member: StaffSummary;
+  score: number;
+  values: number[];
+  clubReputation: number | null;
+  tags: AdviceTag[];
+}
+
+/** A staff job: who does it at the club, how well, and who would do it better. */
+export interface StaffAdvice {
+  key: string;
+  jobs: number[];
+  attributes: string[];
+  wanted: number;
+  need: Need;
+  bestScore: number | null;
+  members: StaffPick[];
+  candidates: StaffPick[];
+}
+
+/** `club_advice`: where a club's squad and staff are short, and who would fill them. */
+export interface ClubAdvice {
+  club: ClubSummary;
+  finances: Finances | null;
+  /** The team advised on, and the club's teams to choose from. */
+  team: number;
+  teams: TeamChoice[];
+  squadSize: number;
+  averageAge: number | null;
+  /** The average current ability of the squad's best eleven. */
+  level: number;
+  roles: RoleAdvice[];
+  /** The formation of the suggested eleven, and the eleven, from the goalkeeper up. */
+  formation: string;
+  eleven: XiPick[];
+  /** Whether the eleven was drawn in the manager's own tactic, and its style as the game codes it ("CONT"...). */
+  ownTactic: boolean;
+  tacticStyle: string | null;
+  /** The players not fully ready: injured, banned, tired, unsharp, jaded, low in morale or unhappy. */
+  readiness: Readiness[];
+  staff: StaffAdvice[];
 }

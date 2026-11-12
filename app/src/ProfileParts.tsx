@@ -340,6 +340,8 @@ export function WageFact({ wage }: { wage: number }) {
         <Fact label={profileText.wage}>
           <EditableValue field="contract.wage">{formatMoney(wage)}</EditableValue>
         </Fact>
+        {/* A year of 52 weeks, as the game counts a payroll a year from its wages a week. */}
+        <Fact label={profileText.wagePerYear}>{formatMoney(wage * 52)}</Fact>
       </dl>
       <p className="note">{profileText.wageNote(converts)}</p>
     </>

@@ -3,6 +3,7 @@
 
 #![cfg(any(windows, target_os = "macos"))]
 
+mod advice;
 #[cfg(target_os = "macos")]
 pub mod bridge_setup;
 mod calibrate;
@@ -45,6 +46,11 @@ mod staff_move;
 mod text;
 mod transfer;
 
+pub use advice::{
+    AdviceOptions, Candidate, ClubAdvice, Disposition, FORMATIONS, INTEREST_POOL, Interest, JADED, LOW_MORALE, Need,
+    Readiness, RoleAdvice, RoleMember, StaffAdvice, StaffPick, TIRED, Tag, TeamChoice, UNSHARP, XiPick, advise,
+    best_eleven, home_nation, judge, refine,
+};
 pub use calibrate::{ArrayRef, EntityArrays, calibrate};
 pub use clauses::{
     ClausePlan, ClauseSet, MOST_CLAUSE_AMOUNT, MOST_CLAUSE_CONDITION, RELEASE_CLAUSE, RELEASE_CLAUSES,
@@ -105,7 +111,8 @@ pub use staff::{
     read_staff_details,
 };
 pub use staff_move::{
-    DIRECTOR_OF_FOOTBALL, Department, MANAGER, NewStaffContract, Post, STAFF_JOBS, StaffChange, StaffPlan, post_of,
+    DIRECTOR_OF_FOOTBALL, Department, MANAGER, NewStaffContract, Post, STAFF_JOBS, Severance, StaffChange, StaffPlan,
+    post_of,
 };
 pub use text::{fold, is_name_like, read_fm_string, read_name_entry};
 pub use transfer::{Amounts, ClubMoney, ClubMove, FeePlan, MAX_FEE, MoveError, MovePlan, MoveTerms, Paid, RoomMaker};

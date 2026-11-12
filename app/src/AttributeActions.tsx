@@ -8,9 +8,11 @@ import {
   freezeStaffAttributes,
   frozenPlayers,
   frozenStaff,
+  makeWonderkid,
   maxAttributes,
   maxStaffAttributes,
   undoBatch,
+  type WonderLevel,
 } from "./editing";
 import { describeError } from "./format";
 import { InfoTip } from "./InfoTip";
@@ -52,6 +54,7 @@ export function AttributeActions({
   // Whether his attributes are frozen; null until the app has said.
   const [frozen, setFrozen] = useState<boolean | null>(null);
   const [freezeError, setFreezeError] = useState<string | null>(null);
+  const [level, setLevel] = useState<WonderLevel>("wonderkid");
   const alive = useRef(true);
   const resultBox = useRef<HTMLDivElement>(null);
 
@@ -126,6 +129,20 @@ export function AttributeActions({
       };
     });
 
+  const wonderkid = () =>
+    write(async () => {
+      const report = await makeWonderkid(uid, level);
+      const lines = report.failed
+        .slice(0, PROBLEMS_SHOWN)
+        .map(({ field, error }) => `${fieldLabel(entity, field)}: ${describeError(error)}`);
+      return {
+        message: profileText.wonderkidDone(report.applied),
+        failed: false,
+        problems: lines,
+        batch: report.applied > 0 ? report.batch : null,
+      };
+    });
+
   const undo = (batch: number) =>
     write(async () => {
       const done = await undoBatch(batch);
@@ -169,6 +186,33 @@ export function AttributeActions({
         >
           {profileText.maxAttributes}
         </button>
+        {!staff && (
+          <span className="wonderkid-line">
+            <select
+              className="wonderkid-level"
+              aria-label={profileText.wonderkidLevel}
+              value={level}
+              disabled={!editable}
+              onChange={(e) => setLevel(e.currentTarget.value as WonderLevel)}
+            >
+              {(["prospect", "wonderkid", "generational"] as const).map((key) => (
+                <option key={key} value={key}>
+                  {profileText.wonderkidLevels[key]}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="max-toggle"
+              disabled={!editable}
+              aria-disabled={busy || undefined}
+              title={editable ? profileText.wonderkidTitle : readOnlyNote}
+              onClick={() => void wonderkid()}
+            >
+              {profileText.wonderkid}
+            </button>
+          </span>
+        )}
         {frozen !== null && (
           <span className="freeze-line">
             <label className="freeze-toggle" title={editable ? freezeNote : readOnlyNote}>

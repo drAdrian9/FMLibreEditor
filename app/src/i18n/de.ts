@@ -12,7 +12,7 @@
 // "von" a count takes the dative ("von 3 Spielern", "von 12 Vereinen").
 
 import type { Entity } from "../types";
-import type { ErrorTexts, Strings } from "./en";
+import { withEnglish, type ErrorTexts, type Strings } from "./en";
 import { fieldName } from "./fieldNames";
 
 const numbers = new Intl.NumberFormat("de-DE");
@@ -435,7 +435,7 @@ const errors: ErrorTexts = {
     "Diese Vorschau ist nicht mehr aktuell. Erstellen Sie die Vorschau der Massenbearbeitung erneut.",
 };
 
-export const de: Strings = {
+export const de: Strings = withEnglish({
   attributes: {
     // Technik
     corners: "Ecken",
@@ -2434,4 +2434,4 @@ export const de: Strings = {
   },
 
   errors,
-};
+});

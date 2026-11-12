@@ -22,6 +22,7 @@ import { createPortal } from "react-dom";
 import { Ability } from "./Ability";
 import { call } from "./api";
 import {
+  clubSquads,
   dateFromNumber,
   isoFromNumber,
   movePlayer,
@@ -41,6 +42,7 @@ import {
   clubListText,
   fieldLabel,
   jobLabel,
+  teamLabel,
   moveText as text,
   positionLabel,
   profileText,
@@ -60,6 +62,7 @@ import {
 } from "./moveTerms";
 import { ReputationMeter } from "./ProfileParts";
 import type {
+  ClubTeam,
   ClubPage,
   ClubSummary,
   Contract,
@@ -210,7 +213,8 @@ const planKey = (
   fee: number | undefined,
   release: number | undefined,
   job?: number,
-) => `${club}:${terms.wage ?? ""}:${terms.expires ?? ""}:${fee ?? ""}:${release ?? ""}:${job ?? ""}`;
+  team?: number,
+) => `${club}:${terms.wage ?? ""}:${terms.expires ?? ""}:${fee ?? ""}:${release ?? ""}:${job ?? ""}:${team ?? ""}`;
 
 /** A player the club can release, as one line of the list to pick from: his name, his ability, and what speaks against. */
 const makerLabel = (row: RoomMaker) =>
@@ -529,6 +533,10 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
   const [job, setJob] = useState<number | null>(ownJob);
   // The jobs the editor gives, once the app has said which.
   const [jobs, setJobs] = useState<number[] | null>(null);
+  // For one signed, the club's team he works for (0 the senior team; an academy's, by its place in the club's list),
+  // and the club's teams to choose from: the senior team and those with an age limit.
+  const [staffTeam, setStaffTeam] = useState(0);
+  const [teams, setTeams] = useState<ClubTeam[] | null>(null);
 
   useModal(dialog, !moving, onClose);
 
@@ -563,6 +571,7 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
   const askedJob = staff && job !== null && job !== ownJob ? job : undefined;
   const needsJob = staff && signing && job === null;
   const staffTerms = staff && signing ? terms : undefined;
+  const askedTeam = staff && signing && staffTeam !== 0 ? staffTeam : undefined;
 
   const swap = mode === "swap";
 
@@ -585,7 +594,7 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
       ? swapKey(partner.uid)
       : null
     : club !== null && valid && !needsJob && (fullClub === null || release !== undefined)
-      ? planKey(club.uid, terms, fee, release, askedJob)
+      ? planKey(club.uid, terms, fee, release, askedJob, askedTeam)
       : null;
   const outcome = key !== null && planned?.key === key ? planned.outcome : null;
   const preview = outcome !== null && "preview" in outcome ? outcome.preview : null;
@@ -598,7 +607,7 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
     : club &&
       (() =>
         staff
-          ? moveStaff(player.uid, club.uid, askedJob, staffTerms)
+          ? moveStaff(player.uid, club.uid, askedJob, staffTerms, askedTeam)
           : movePlayer(player.uid, club.uid, terms, fee, release));
 
   // The clubs on show. Until the search has answered for what is typed they are the last ones: Enter leaves them alone.
@@ -666,12 +675,12 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
     const asked = termsOf(wage, expires);
     const answer = (result: Planned["outcome"]) => {
       if (!cancelled) {
-        setPlanned({ key: planKey(club.uid, asked, fee, release, askedJob), outcome: result });
+        setPlanned({ key: planKey(club.uid, asked, fee, release, askedJob, askedTeam), outcome: result });
       }
     };
     const timer = setTimeout(() => {
       (staff
-        ? planStaffMove(player.uid, club.uid, askedJob, signing ? asked : undefined)
+        ? planStaffMove(player.uid, club.uid, askedJob, signing ? asked : undefined, askedTeam)
         : planClubMove(player.uid, club.uid, asked, fee, release)
       ).then(
         (made) => answer({ preview: made }),
@@ -687,7 +696,25 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [swap, staff, signing, player.uid, club, valid, needsJob, askedJob, wage, expires, fee, release, waitingForLeaver, replans]);
+  }, [swap, staff, signing, player.uid, club, valid, needsJob, askedJob, askedTeam, wage, expires, fee, release, waitingForLeaver, replans]);
+
+  // The teams of the club picked, for one signed: read again for each club, the senior team picked again meanwhile.
+  const pickedClub = club?.uid ?? null;
+  useEffect(() => {
+    setStaffTeam(0);
+    setTeams(null);
+    if (!staff || !signing || pickedClub === null) {
+      return;
+    }
+    let cancelled = false;
+    clubSquads(pickedClub).then(
+      (found) => !cancelled && setTeams(found.filter((t) => t.index === 0 || t.ageLimit !== null)),
+      () => !cancelled && setTeams([]),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [staff, signing, pickedClub]);
 
   // The players a club with a full squad list can release, asked once the plan found it full, and again after a move
   // the game refused.
@@ -1135,6 +1162,25 @@ function MoveDialog({ player, kind, contract, onMoved, onClose }: MoveDialogProp
                     ))}
                   </select>
                 </div>
+                {signing && teams !== null && teams.length > 1 && (
+                  <div className="move-term">
+                    <label htmlFor={id("team")}>{text.staffTeam}</label>
+                    <select
+                      id={id("team")}
+                      className="move-input"
+                      value={staffTeam}
+                      disabled={moving}
+                      onChange={(e) => setStaffTeam(Number(e.currentTarget.value))}
+                    >
+                      {teams.map((t) => (
+                        <option key={t.index} value={t.index}>
+                          {teamLabel({ index: t.index, kind: t.kind, ageLimit: t.ageLimit })}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="move-note">{text.staffTeamHint}</p>
+                  </div>
+                )}
               </div>
             </section>
           )}

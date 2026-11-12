@@ -8,6 +8,7 @@ import { ListBrowser } from "./ListBrowser";
 import { MassEditButton } from "./MassEditDialog";
 import { ClubLogo, NationFlag, PICTURE_SIZE, WithPicture } from "./Picture";
 import { countFilters, PlayerFilterBar, toPlayerFilter, type PlayerFilterFields } from "./PlayerFilters";
+import { QuickSearch } from "./QuickSearch";
 import { PlayerProfile } from "./PlayerProfile";
 import { restored, useSnapshot } from "./restore";
 import { SavedFilterControls } from "./SavedFilterControls";
@@ -76,6 +77,8 @@ export function PlayerBrowser({ version, active, genderKnown, comparison }: Play
       }
       empty={(query) => text.empty(query, filterCount > 0)}
       filterBar={
+        <>
+        <QuickSearch version={version} onApply={setFields} />
         <PlayerFilterBar
           fields={fields}
           onChange={setFields}
@@ -94,6 +97,7 @@ export function PlayerBrowser({ version, active, genderKnown, comparison }: Play
             />
           }
         />
+        </>
       }
       toolbarActions={(list) => (
         <>

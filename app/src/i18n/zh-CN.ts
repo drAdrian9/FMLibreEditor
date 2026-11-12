@@ -13,7 +13,7 @@ import type {
   StaffSort,
   Storefront,
 } from "../types";
-import type { Strings } from "./en";
+import { withEnglish, type Strings } from "./en";
 import { fieldName } from "./fieldNames";
 
 const numbers = new Intl.NumberFormat("zh-CN");
@@ -383,7 +383,7 @@ const TRAIT_NAMES_ZH: readonly string[] = [
   "用脚处理球"
 ];
 
-export const zhCN: Strings = {
+export const zhCN: Strings = withEnglish({
   attributes: {
     // Technical
     corners: "角球",
@@ -2626,6 +2626,6 @@ export const zhCN: Strings = {
   },
 
   errors,
-};
+});
 
 /** What a dictionary has to provide. */

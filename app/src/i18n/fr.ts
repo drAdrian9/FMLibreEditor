@@ -14,7 +14,7 @@
 // %, and inside « » ("\u00a0" below).
 
 import type { Entity } from "../types";
-import type { ErrorTexts, Strings } from "./en";
+import { withEnglish, type ErrorTexts, type Strings } from "./en";
 import { fieldName } from "./fieldNames";
 
 const numbers = new Intl.NumberFormat("fr-FR");
@@ -457,7 +457,7 @@ const errors: ErrorTexts = {
   "mass.outOfDate": () => "Cet aperçu n'est plus à jour. Relancez l'aperçu de la modification groupée.",
 };
 
-export const fr: Strings = {
+export const fr: Strings = withEnglish({
   attributes: {
     // Technique
     corners: "Corners",
@@ -2451,4 +2451,4 @@ export const fr: Strings = {
   },
 
   errors,
-};
+});

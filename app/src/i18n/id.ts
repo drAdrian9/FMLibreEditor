@@ -9,7 +9,8 @@
 // Indonesian has no plural after a number ("3 perubahan", "1 pemain"), so the counts need no forms of their own.
 
 import type { Entity, GraphicsCounts, MassPreview } from "../types";
-import type { ErrorTexts, Strings } from "./en";
+import { withEnglish, type ErrorTexts, type Strings } from "./en";
+import { PERSIJA_ID } from "./idPersija";
 import { fieldName } from "./fieldNames";
 
 const numbers = new Intl.NumberFormat("id-ID");
@@ -359,7 +360,7 @@ const TRAIT_NAMES_ID: readonly string[] = [
   "Bermain bola dengan kaki",
 ];
 
-export const id: Strings = {
+export const id: Strings = withEnglish({
   attributes: {
     corners: "Sepak Pojok",
     crossing: "Umpan Silang",
@@ -2211,4 +2212,4 @@ export const id: Strings = {
   },
 
   errors,
-};
+}, PERSIJA_ID);

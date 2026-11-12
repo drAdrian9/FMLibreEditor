@@ -55,6 +55,18 @@ pub struct PlayerSummary {
     /// Whether this is a woman, for the list's filter; unknown where the layout does not place the gender flags.
     #[serde(skip)]
     pub woman: Option<bool>,
+    /// His current reputation, 0–10000 as clubs' are: whom the advice can suggest (see `advise`).
+    #[serde(skip)]
+    pub reputation: u16,
+    /// His wage, in pounds a week, from his contract; none without one. For the list's filter.
+    #[serde(skip)]
+    pub wage: Option<i32>,
+    /// What his club asks for him, in pounds; none where it has set no price. For the list's filter.
+    #[serde(skip)]
+    pub asking_price: Option<i32>,
+    /// His transfer value, in pounds, as the game works it out; none where the layout does not place it.
+    #[serde(skip)]
+    pub value: Option<i32>,
     /// Address of the player object in the game process.
     #[serde(skip)]
     pub address: u64,
@@ -166,6 +178,11 @@ pub fn read_players(
         let contract_expires =
             has_contract.then(|| FmDate::from_raw(contract_u16(c.expires), contract_u16(c.expires + 2))).flatten();
         let listing = if has_contract { contract_buf[c.listing as usize] } else { 0 };
+        let wage = has_contract.then(|| {
+            i32::from_le_bytes(contract_buf[c.wage as usize..c.wage as usize + 4].try_into().expect("4 bytes"))
+        });
+        let asking_price = Some(u32_at(p.asking_price) as i32).filter(|&price| price >= 0);
+        let value = p.transfer_value.map(|offset| u32_at(offset) as i32).filter(|&value| value >= 0);
         players.push(PlayerSummary {
             uid,
             name,
@@ -187,6 +204,10 @@ pub fn read_players(
             loan_listed: listing & 2 != 0,
             transfer_value: p.transfer_value.map(|offset| u32_at(offset) as i32),
             woman: p.gender.map(|offset| is_woman(buf[at(offset)])),
+            reputation: u16_at(p.current_reputation),
+            wage,
+            asking_price,
+            value,
             address: object,
             shift,
         });

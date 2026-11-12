@@ -15,6 +15,7 @@ import {
   undoBatch,
 } from "./editing";
 import { fieldTable } from "./fieldTables";
+import { MassPresets } from "./MassPresets";
 import { currencySymbol, describeError } from "./format";
 import { changesText, editText, fieldLabel, massEditText as text, profileText, valueChange } from "./labels";
 import type { ListState } from "./ListBrowser";
@@ -409,6 +410,23 @@ function MassEditDialog({ entity, scope, onClose }: { entity: Entity; scope: Mas
 
           {!blocked && fields !== null && rows.length > 0 && (
             <>
+              <MassPresets
+                entity={entity}
+                rows={rows}
+                disabled={busy !== null || applied}
+                onLoad={(saved) => {
+                  // Only fields this list has, each once, as many as one mass edit takes.
+                  const seen = new Set<string>();
+                  const next = saved
+                    .filter((row) => byKey.has(row.field) && !seen.has(row.field) && seen.add(row.field))
+                    .slice(0, MAX_OPERATIONS)
+                    .map((row) => ({ ...row, id: nextId.current++ }));
+                  if (next.length > 0) {
+                    setRows(next);
+                    setPreview(null);
+                  }
+                }}
+              />
               <form
                 className="mass-form"
                 noValidate

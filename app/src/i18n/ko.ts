@@ -12,7 +12,7 @@
 // after a name or a number pick it with `particle`.
 
 import type { Entity } from "../types";
-import type { ErrorTexts, Strings } from "./en";
+import { withEnglish, type ErrorTexts, type Strings } from "./en";
 import { fieldName } from "./fieldNames";
 
 const numbers = new Intl.NumberFormat("ko-KR");
@@ -404,7 +404,7 @@ const errors: ErrorTexts = {
   "mass.outOfDate": () => "이 미리보기는 더 이상 최신이 아닙니다. 일괄 편집 미리보기를 다시 실행하세요.",
 };
 
-export const ko: Strings = {
+export const ko: Strings = withEnglish({
   attributes: {
     // Technical
     corners: "코너킥",
@@ -2281,4 +2281,4 @@ export const ko: Strings = {
   },
 
   errors,
-};
+});

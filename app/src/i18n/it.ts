@@ -11,7 +11,7 @@
 // giocatori esclusi"), so the sentences with a count are written out for one and for many.
 
 import type { Entity } from "../types";
-import type { ErrorTexts, Strings } from "./en";
+import { withEnglish, type ErrorTexts, type Strings } from "./en";
 import { fieldName } from "./fieldNames";
 
 const numbers = new Intl.NumberFormat("it-IT");
@@ -418,7 +418,7 @@ const errors: ErrorTexts = {
   "mass.outOfDate": () => "Questa anteprima non è più aggiornata. Genera di nuovo l'anteprima della modifica multipla.",
 };
 
-export const it: Strings = {
+export const it: Strings = withEnglish({
   attributes: {
     // Tecnica
     corners: "Calci d'angolo",
@@ -2372,4 +2372,4 @@ export const it: Strings = {
   },
 
   errors,
-};
+});

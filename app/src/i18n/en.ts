@@ -123,6 +123,7 @@ const errors: ErrorTexts = {
   "export.notAllowed": (p) =>
     `FMLibreEditor may not write to ${p.folder}. If macOS asked whether it may use your Documents folder, allow it ` +
     "in System Settings › Privacy & Security › Files & Folders, then export again.",
+  "advice.noClub": () => "The save names no club you manage. Load a career save and reload.",
   "export.openFailed": (p) => `Could not open it: ${p.reason}`,
   "guard.unknownBuild": () =>
     "FMLibreEditor has not been checked with this version of the game, so it does not write to it. Edit anyway, in " +
@@ -588,6 +589,7 @@ export const en = {
     // Contract
     contract: "Contract",
     wage: "Wage per week",
+    wagePerYear: "Wage per year",
     /** Under the wage: the game keeps money in pounds; `converted` when the app shows another currency. */
     wageNote: (converted: boolean): string =>
       converted
@@ -611,6 +613,8 @@ export const en = {
     u21Caps: "U21 caps",
     u21Goals: "U21 goals",
     askingPrice: "Asking price",
+    transferValue: "Transfer value",
+    transferValueTitle: "What the game works out he is worth, which it shows as a range where it knows him less",
     notSet: "Not set",
     reputation: "Reputation",
     reputationHome: "Home",
@@ -746,6 +750,14 @@ export const en = {
     // Above the attributes, while the profile is read
     /** Sets every attribute of the player to its best at once. */
     maxAttributes: "Max attributes",
+    /** Make WonderKid: the level picked beside it, the button, and what it wrote. */
+    wonderkid: "Make WonderKid",
+    wonderkidLevel: "How far Make WonderKid goes",
+    wonderkidLevels: { prospect: "Prospect (PA 155)", wonderkid: "WonderKid (PA 175)", generational: "Generational (PA 195)" },
+    wonderkidTitle:
+      "Raises his potential ability, professionalism, ambition, determination, consistency and big-match temper to the level, and lowers his injury proneness; nothing better is lowered, and his current ability stays, so he still has to grow",
+    wonderkidDone: (count: number) =>
+      count === 0 ? "Already at least that good" : count === 1 ? "1 change written" : `${count} changes written`,
     maxAttributesTitle: "Set every attribute of this player to its best: 20, and 1 for injury proneness and dirtiness",
     /** What Max attributes wrote, beside the button that takes it back; then what that undid. */
     maxAttributesDone: (count: number) =>
@@ -850,6 +862,17 @@ export const en = {
     } satisfies Record<PlayerSort, string>,
     /** The filters; the staff list has those that are not about players too (see FilterBar.tsx). */
     filters: {
+      /** Leaves out the players of a nation: a club's foreign players are those not of its own. */
+      excludeNation: "Not nation",
+      /** The quick search above the filters: a sentence turned into them. */
+      quick: {
+        label: "Quick search",
+        placeholder: "e.g. striker lokal u23 pa 140+ nilai < 5B · kiper asing umur 25-30 gaji max 100jt · free agent dc ca 120",
+        apply: "Find",
+        understood: "Understood:",
+        unknown: (words: string) => `Not understood: ${words}`,
+        nothing: "Nothing understood. Try a position, an age (u23), CA/PA (pa 140+), money (nilai < 5B), lokal/asing.",
+      },
       /** The button that shows or hides the filters. */
       toggle: "Filters",
       /** Its name for assistive technology while `count` of the filters are in effect. */
@@ -868,6 +891,18 @@ export const en = {
       /** The hint in an empty age input. */
       minPlaceholder: "Min",
       maxPlaceholder: "Max",
+      currentAbility: "CA",
+      currentAbilityTitle: "Current ability, 1–200: the least and the most",
+      potentialAbility: "PA",
+      potentialAbilityTitle: "Potential ability, 1–200: the least and the most",
+      wage: (symbol: string) => `Wage (${symbol}/week)`,
+      wageTitle: "The wage of his contract, a week; players without a contract are left out by this filter",
+      transferValue: (symbol: string) => `Transfer value (${symbol})`,
+      transferValueTitle: "What the game works out a player is worth, as it keeps it: one figure, where it shows a range for players it knows less",
+      askingPrice: (symbol: string) => `Asking price (${symbol})`,
+      askingPriceTitle:
+        "What his club asks for him; FM works out the transfer value it shows itself and does not keep it, so this is " +
+        "the club's price, and players whose club has set none are left out by this filter",
       minCurrentAbility: "Min CA",
       minCurrentAbilityTitle: "Minimum current ability",
       minPotentialAbility: "Min PA",
@@ -989,7 +1024,15 @@ export const en = {
     // The tabs under the header: what the club has, and its squad (see `squad`).
     /** The name of the tabs for assistive technology. */
     tabsLabel: "Club sections",
-    tabs: { overview: "Overview", squad: "Squad", stadium: "Stadium" },
+    tabs: { overview: "Overview", squad: "Squad", staff: "Staff", stadium: "Stadium" },
+    /** The Staff tab: everyone whose contract is with the club, by department. */
+    staff: {
+      loading: "Reading the staff…",
+      none: "No staff under contract with this club.",
+      count: (n: number) => (n === 1 ? "1 member of staff" : `${n} members of staff`),
+      groups: { management: "Management", coaching: "Coaching", medical: "Medical", scouting: "Scouting", other: "Other" },
+      columns: { name: "Name", job: "Job", age: "Age", nation: "Nation", ca: "CA", pa: "PA", contractEnds: "Contract ends" },
+    },
     /** Hover text of the Squad tab while the club is edited: its values are on the Overview. */
     squadLocked: "Finish editing to open the squad",
 
@@ -1373,6 +1416,174 @@ export const en = {
   },
 
   /** The Changes view: what was written to the game this session. */
+  /** The advice on the club the user manages: the Advisor view. */
+  advice: {
+    nav: "Advisor",
+    title: "Squad advisor",
+    intro:
+      "Reads your club's senior squad and staff from the save and suggests where to strengthen it. A rule of thumb, " +
+      "not FM's own judgement: a place counts as covered by the players rated 15 or more there, and a signing as an " +
+      "upgrade by his current ability. Nothing here writes to the game; open someone to edit or move them.",
+    club: "Club",
+    analyse: "Analyse again",
+    analysing: "Analysing the squad…",
+    maxAge: "Oldest",
+    maxAgeTitle: "The oldest a player suggested may be",
+    realistic: "Realistic targets",
+    realisticTitle:
+      "Only free agents, and players and staff of clubs at most a little above yours in reputation: those who would " +
+      "come",
+    interested: "Only players who would come",
+    interestedTitle:
+      "Strict: leaves out anyone of more renown than the club, at a bigger club, ambitious and not stepping up, " +
+      "loyal and settled, or dearer than the budgets, and keeps only those likely to say yes. Still an estimate: the " +
+      "game decides, on more than the save shows.",
+    interestLevels: { likely: "Likely", maybe: "Maybe", unlikely: "Unlikely" },
+    reasons: {
+      tooBig: "Too big for the club",
+      stepUp: "A step up",
+      stepDown: "A step down",
+      ambitious: "Ambitious",
+      loyal: "Loyal to his club",
+      unhappy: "Unhappy",
+      listed: "Transfer listed",
+      freeAgent: "Free agent",
+      expiring: "Contract ending",
+      starter: "Would start",
+      backup: "Would be a backup",
+      veteran: "Late in his career",
+      domestic: "From the club's country",
+      wage: "Wage over budget",
+      fee: "Fee over budget",
+    },
+    sections: { squad: "Positions", eleven: "Best XI", readiness: "Readiness", staff: "Staff" },
+    /** The team's players who are not fully ready. */
+    readiness: {
+      note: "The players of this team who are injured, banned, tired (energy under 85%), short of match sharpness (under 60%), jaded, low in morale (8 or less of 20) or unhappy.",
+      allReady: "Everyone is fit and happy.",
+      why: "Why",
+      injury: "Injury",
+      injured: (name: string, back: string | null) => (back ? `${name}, back ${back}` : name),
+      banned: (matches: number) => (matches === 1 ? "Banned 1 match" : `Banned ${matches} matches`),
+      tired: (percent: number) => `Energy ${percent}%`,
+      unsharp: (percent: number) => `Sharpness ${percent}%`,
+      jaded: "Jaded",
+      lowMorale: (morale: number) => `Morale ${morale}/20`,
+      concerns: (count: number) => (count === 1 ? "1 concern" : `${count} concerns`),
+      unhappy: "Unhappy",
+    },
+    /** The suggested eleven. */
+    eleven: {
+      formation: "Formation",
+      average: (ca: number) => `Average CA ${ca}`,
+      note: "The player of this team worth most in each place, by his rating in the position and his current ability. A suggestion only: your team selection in the game is not changed. The injured and the banned are left out.",
+      nobody: "No one left",
+      useTactic: "Use my tactic",
+      useTacticTitle: "Draw the eleven in the formation of the tactic you play in the game (first team only). Reading it takes a few seconds.",
+      ownTactic: (style: string | null) => `In the formation of your tactic${style ? ` (${style})` : ""}.`,
+      noTactic: "Your tactic could not be read (or this is not the first team): the formation picked is used.",
+      leftOut: (names: string) => `Left out, injured or banned: ${names}`,
+    },
+    summary: {
+      squad: "Senior squad",
+      averageAge: "Average age",
+      level: "Best XI level",
+      levelTitle: "The average current ability of the eleven best players of the squad: what each place is measured against",
+      transferBudget: "Transfer budget",
+      wageBudget: "Wage budget",
+      perWeek: (amount: string) => `${amount} p/w`,
+    },
+    roles: {
+      gk: "Goalkeeper",
+      dc: "Centre-back",
+      dl: "Left-back",
+      dr: "Right-back",
+      dm: "Defensive midfielder",
+      mc: "Central midfielder",
+      aml: "Left winger",
+      amr: "Right winger",
+      amc: "Attacking midfielder",
+      st: "Striker",
+    } as Record<string, string>,
+    staffRoles: {
+      assistant: "Assistant manager",
+      coach: "First-team coach",
+      goalkeeping: "Goalkeeping coach",
+      fitness: "Fitness coach",
+      setPieces: "Set-piece coach",
+      physio: "Physio",
+      sportsScience: "Sports scientist",
+      scout: "Scout",
+      performance: "Performance analyst",
+      recruitment: "Recruitment analyst",
+      youth: "Head of youth development",
+      technicalDirector: "Technical director",
+    } as Record<string, string>,
+    needs: { covered: "Covered", thin: "Thin", weak: "Weak", short: "Short" },
+    needTitles: {
+      covered: "Enough players, and good enough",
+      thin: "Fewer players than a squad wants here",
+      weak: "The best player here is well below the rest of the team",
+      short: "No one, or hardly anyone, plays here",
+    },
+    staffNeedTitles: {
+      covered: "Filled, and well",
+      thin: "Fewer staff than this job wants",
+      weak: "The best at this job is not good at it",
+      short: "No one does this job",
+    },
+    /** "2.5 of 4". */
+    cover: (cover: string, wanted: number) => `${cover} of ${wanted}`,
+    coverTitle: "Players who can play here: those for whom it is the best place count whole, the others half",
+    best: (ability: number) => `best ${ability}`,
+    nobody: "no one",
+    staffBest: (score: string) => `best ${score}`,
+    members: "In your squad",
+    noMembers: "No one in your squad plays here.",
+    candidates: "Suggested signings",
+    local: "Local",
+    foreign: "Foreign",
+    team: "Team",
+    teamTitle: "Which of the club's teams to advise on; a youth team is offered only players of its age",
+    candidatesNote: (target: number) =>
+      `Current ability ${target} or more, and young players with the potential to grow past your level.`,
+    noCandidates: "No one fits. Raise the oldest age or turn off realistic targets.",
+    staffMembers: "At your club",
+    noStaffMembers: "No one at your club does this job.",
+    staffCandidates: "Suggested staff",
+    staffCandidatesNote:
+      "Better at this job's attributes than your best; free agents first, as they cost no compensation.",
+    noStaffCandidates: "No one better fits. Turn off realistic targets to look further.",
+    columns: {
+      name: "Name",
+      age: "Age",
+      positions: "Positions",
+      club: "Club",
+      rating: "Rating",
+      ratingTitle: "His rating at the place, 1–20 (15 or more: accomplished)",
+      ca: "CA",
+      pa: "PA",
+      gain: "Gain",
+      gainTitle: "His current ability less that of your best player at the place",
+      interest: "Interest",
+      interestTitle: "How likely he is to want to come: an estimate, hover for why",
+      price: "Asking price",
+      contract: "Contract",
+      why: "Why",
+      job: "Job",
+      score: "Score",
+      scoreTitle: "The average of the job's key attributes, 1–20",
+    },
+    tags: {
+      freeAgent: "Free agent",
+      transferListed: "Transfer listed",
+      loanListed: "Loan listed",
+      expiring: "Contract ending",
+      prospect: "Prospect",
+    },
+    mainPlace: "His best place",
+  },
+
   changes: {
     /** The entry in the sidebar. */
     nav: "Changes",
@@ -1388,6 +1599,9 @@ export const en = {
     fee: (amount: string) => `Fee ${amount}`,
     /** Under a recall from loan that took the loan's option to buy away, which its undo writes back. */
     optionRemoved: (amount: string) => `Option to buy (${amount}) taken away`,
+    /** Under a member of staff released: how his contract ended, and what his club paid him, written out. */
+    terminated: (amount: string) => `Contract terminated, paid ${amount}`,
+    mutualEnd: (amount: string) => `Mutual termination, paid ${amount}`,
     /** What a heal changed, in the place of its values: `count` is how many injuries the player had. */
     healed: (count: number) => (count === 1 ? "Healed 1 injury" : `Healed ${format(count)} injuries`),
     /** The same for lifting bans: `count` is how many bans the player had. */
@@ -1510,6 +1724,22 @@ export const en = {
 
   /** Mass editing: the button in the toolbar of a list and the dialog it opens. */
   massEdit: {
+    /** Presets: the rows of the dialog saved under a name, to fill them again with one pick. */
+    presets: {
+      label: "Saved presets",
+      none: "No saved presets",
+      choose: "Load a preset…",
+      save: "Save as preset",
+      delete: "Delete",
+      nameLabel: "Name of the preset",
+      namePlaceholder: "e.g. Refresh U21",
+      confirm: "Save",
+      cancel: "Cancel",
+      saved: (name: string) => `Saved “${name}”`,
+      deleted: (name: string) => `Deleted “${name}”`,
+      full: (max: number) => `No room: ${max} presets at most. Delete one first.`,
+      cannotSave: "Presets cannot be saved here (the browser storage is unavailable).",
+    },
     /** The button in the toolbar of the player, staff and club lists. */
     button: "Mass edit",
     buttonTitle: "Change values of everything the list shows, with a preview first",
@@ -1812,6 +2042,8 @@ export const en = {
     /** The select of the job they take at the club, and its first choice for one who has no job yet. */
     staffJob: "Job",
     staffJobChoose: "Choose a job…",
+    staffTeam: "Team",
+    staffTeamHint: "An academy's staff (U21, U18), its manager too, work for that team; a director of football for the club.",
     /** After the name of their own job in that select. */
     staffJobKept: (job: string) => `${job} (keeps it)`,
     /** In the place of `staffContract` when another job is chosen. */
@@ -2078,6 +2310,44 @@ export const en = {
     hint: "Nothing changes in the game until you press Recall.",
     confirm: "Recall",
     confirming: "Recalling…",
+    cancel: "Cancel",
+  },
+
+  /** Releasing a member of staff: the button beside Transfer in his profile, and its dialog. */
+  staffRelease: {
+    button: "Release",
+    buttonTitle: "End this member of staff's contract: terminate it or agree a mutual termination",
+    title: "Release staff",
+    from: "Leaves",
+    contractHeading: "Contract",
+    /** What is left of the contract: the weekly wage, the end date, the weeks to go and their total. */
+    left: (wage: string, expires: string, weeks: string, total: string) =>
+      `${wage} a week until ${expires}: ${weeks} weeks left, ${total} in all`,
+    nothingLeft: "No end date the editor can read: nothing left to pay",
+    howHeading: "How the contract ends",
+    terminate: "Terminate contract",
+    terminateOutcome: "The club pays what is left of the contract",
+    mutual: "Mutual termination",
+    mutualOutcome: "They agree to leave, for the amount you set",
+    amount: "Payment",
+    amountHint: "Empty or 0: they leave for nothing.",
+    badAmount: "The payment must be a whole amount, 0 or more.",
+    checking: "Checking the release…",
+    /** The member of staff can be released; `club` is the name of their club. */
+    ready: (club: string) => `${club} → no club`,
+    /** What the payment does to the club's balance. */
+    pays: (club: string, amount: string, before: string, after: string) =>
+      `${club} pays ${amount}: balance ${before} → ${after}`,
+    noFinances: (club: string) => `The game keeps no finances for ${club}: no one is paid`,
+    doesHeading: "What the release does",
+    does: [
+      "Leaves every department of the club with no contract: any club can hire them",
+      "The payment comes out of the club's balance only",
+      "The game's history does not list it, and the game shows it after you press Continue",
+      "Listed under Changes, where one undo brings them back on the same contract and the money back too",
+    ],
+    hint: "Nothing changes in the game until you confirm.",
+    releasing: "Releasing…",
     cancel: "Cancel",
   },
 
@@ -2586,3 +2856,35 @@ export const en = {
 
 /** What a dictionary has to provide. */
 export type Strings = typeof en;
+
+/** `T` with every key optional, all the way down; functions and lists are taken whole. */
+export type DeepPartial<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends readonly unknown[]
+    ? T
+    : T extends object
+      ? { [K in keyof T]?: DeepPartial<T[K]> }
+      : T;
+
+const isPlain = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function deepMerge(base: Record<string, unknown>, over: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(over)) {
+    out[key] = isPlain(value) && isPlain(base[key]) ? deepMerge(base[key], value) : value;
+  }
+  return out;
+}
+
+/**
+ * A language's text with the English for what it does not have yet: the texts this fork adds (the Advisor, staff
+ * release, quick search...) are in English, Turkish, Spanish and Indonesian, and fall back to English elsewhere.
+ */
+export function withEnglish(...texts: DeepPartial<Strings>[]): Strings {
+  const merged = texts.reduce<Record<string, unknown>>(
+    (out, part) => deepMerge(out, part as Record<string, unknown>),
+    en as unknown as Record<string, unknown>,
+  );
+  return merged as unknown as Strings;
+}

@@ -65,9 +65,22 @@ pub struct PlayerFilter {
     pub min_age: Option<u16>,
     pub max_age: Option<u16>,
     pub min_current_ability: Option<u16>,
+    pub max_current_ability: Option<u16>,
     pub min_potential_ability: Option<i16>,
+    pub max_potential_ability: Option<i16>,
+    /// Bounds on the wage, in pounds a week: a player without a contract matches none.
+    pub min_wage: Option<i32>,
+    pub max_wage: Option<i32>,
+    /// Bounds on the asking price, in pounds: a player whose club has set none matches none.
+    pub min_asking_price: Option<i32>,
+    pub max_asking_price: Option<i32>,
+    /// Bounds on the transfer value, in pounds.
+    pub min_value: Option<i32>,
+    pub max_value: Option<i32>,
     /// Part of the nation's name, accents and case ignored.
     pub nation: Option<String>,
+    /// Leaves out the players whose nation's name has this in it: the foreign players of a club, for one.
+    pub exclude_nation: Option<String>,
     /// Part of the club's name, accents and case ignored.
     pub club: Option<String>,
     /// Only players of the club with this UID, e.g. those a player can swap with.
@@ -97,8 +110,14 @@ impl PlayerFilter {
             && self.min_age.is_none_or(|min| p.age.is_some_and(|age| age >= min))
             && self.max_age.is_none_or(|max| p.age.is_some_and(|age| age <= max))
             && self.min_current_ability.is_none_or(|min| p.current_ability >= min)
+            && self.max_current_ability.is_none_or(|max| p.current_ability <= max)
             && self.min_potential_ability.is_none_or(|min| p.potential_ability >= min)
+            && self.max_potential_ability.is_none_or(|max| p.potential_ability <= max)
+            && within(p.wage, self.min_wage, self.max_wage)
+            && within(p.asking_price, self.min_asking_price, self.max_asking_price)
+            && within(p.value, self.min_value, self.max_value)
             && contains(p.nation.as_deref(), self.nation.as_deref())
+            && excludes(p.nation.as_deref(), self.exclude_nation.as_deref())
             && contains(p.club.as_deref(), self.club.as_deref())
             && self.club_uid.is_none_or(|uid| p.club_uid == Some(uid))
             && (!self.free_agents || p.club.is_none())
@@ -111,6 +130,14 @@ impl PlayerFilter {
 }
 
 /// Whether `text` contains `needle`, ignoring accents and case; an empty needle matches anything.
+/// Whether `text` does not have `needle` in it, accents and case ignored; true for no needle, and for no text.
+fn excludes(text: Option<&str>, needle: Option<&str>) -> bool {
+    match needle.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(needle) => !text.is_some_and(|text| fold(text).contains(&fold(needle))),
+        None => true,
+    }
+}
+
 fn contains(text: Option<&str>, needle: Option<&str>) -> bool {
     match needle.map(str::trim).filter(|n| !n.is_empty()) {
         Some(needle) => text.is_some_and(|text| fold(text).contains(&fold(needle))),
@@ -191,6 +218,10 @@ fn sort_rows<'a, T>(rows: &mut [&'a T], ascending: bool, key: impl Fn(&'a T) -> 
     }
 }
 
+/// How good a member of staff without a contract must be at a job, as the average of its attributes ×10, to match a
+/// filter on it: 11 of 20.
+pub const FIT_FOR_JOB: u16 = 110;
+
 /// Filters for the staff list, the player list's where they apply to staff. Unset fields match everyone.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -217,8 +248,12 @@ pub struct StaffFilter {
 
 impl StaffFilter {
     pub fn matches(&self, s: &StaffSummary) -> bool {
-        self.job.is_none_or(|job| s.job.is_some_and(|code| code == job || code == job + 1))
-            && self.min_age.is_none_or(|min| s.age.is_some_and(|age| age >= min))
+        self.job.is_none_or(|job| match s.job {
+            Some(code) => code == job || code == job + 1,
+            // Someone without a contract has no job: he matches one he would be fit for, as FM's own search does by
+            // the jobs he would take.
+            None => crate::advice::job_suitability(s, job).is_some_and(|score| score >= FIT_FOR_JOB),
+        }) && self.min_age.is_none_or(|min| s.age.is_some_and(|age| age >= min))
             && self.max_age.is_none_or(|max| s.age.is_some_and(|age| age <= max))
             && self.min_current_ability.is_none_or(|min| s.current_ability >= min)
             && self.min_potential_ability.is_none_or(|min| s.potential_ability >= min)
@@ -278,6 +313,14 @@ impl ClubFilter {
     }
 }
 
+/// Whether `value` lies within the bounds given, `min` and `max`: always without bounds, never without a value.
+fn within(value: Option<i32>, min: Option<i32>, max: Option<i32>) -> bool {
+    if min.is_none() && max.is_none() {
+        return true;
+    }
+    value.is_some_and(|value| min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,6 +349,10 @@ mod tests {
             loan_listed: false,
             transfer_value: None,
             woman: Some(false),
+            reputation: 0,
+            wage: None,
+            asking_price: None,
+            value: None,
             address: 0,
             shift: 0,
         }
@@ -337,6 +384,24 @@ mod tests {
 
     fn bound(key: &str, min: Option<u8>, max: Option<u8>) -> AttributeBound {
         AttributeBound { key: key.to_owned(), min, max }
+    }
+
+    #[test]
+    fn abilities_wages_and_prices_have_both_bounds() {
+        let mut player = player("Rashford", Some(28), 140, Some("Barcelona"), 18);
+        player.potential_ability = 150;
+        player.wage = Some(300_000);
+        player.asking_price = None;
+        let bounded = |f: PlayerFilter| f.matches(&player);
+        assert!(bounded(PlayerFilter { max_current_ability: Some(140), ..PlayerFilter::default() }));
+        assert!(!bounded(PlayerFilter { max_current_ability: Some(139), ..PlayerFilter::default() }));
+        assert!(!bounded(PlayerFilter { max_potential_ability: Some(149), ..PlayerFilter::default() }));
+        assert!(bounded(PlayerFilter { min_wage: Some(200_000), max_wage: Some(300_000), ..PlayerFilter::default() }));
+        assert!(!bounded(PlayerFilter { max_wage: Some(250_000), ..PlayerFilter::default() }));
+        // No price set: any bound on the price leaves him out.
+        assert!(!bounded(PlayerFilter { max_asking_price: Some(i32::MAX), ..PlayerFilter::default() }));
+        player.asking_price = Some(50_000_000);
+        assert!(PlayerFilter { min_asking_price: Some(10_000_000), ..PlayerFilter::default() }.matches(&player));
     }
 
     #[test]
@@ -482,5 +547,34 @@ mod tests {
         // Same age: the incoming order (here by club) decides.
         sort_players(&mut list, PlayerOrder { by: PlayerSort::Age, ascending: true });
         assert_eq!(list.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Özil", "Zico", "pelé"]);
+    }
+
+    #[test]
+    fn staff_without_a_contract_match_the_jobs_they_are_fit_for() {
+        let with = |value: u8| StaffSummary {
+            uid: 1,
+            name: "Free".to_owned(),
+            full_name: None,
+            date_of_birth: None,
+            age: Some(45),
+            nation: None,
+            nation_uid: None,
+            nation_address: 0,
+            club: None,
+            club_uid: None,
+            job: None,
+            current_ability: 100,
+            potential_ability: 100,
+            is_human: false,
+            attributes: vec![value; attribute_keys(crate::STAFF_ATTRIBUTE_GROUPS).count()],
+            contract_expires: None,
+            woman: Some(false),
+            address: 0,
+            shift: 0,
+        };
+        let scouts = StaffFilter { job: Some(14), unemployed: true, ..StaffFilter::default() };
+        assert!(scouts.matches(&with(14)));
+        assert!(!scouts.matches(&with(8)), "not good enough");
+        assert!(!StaffFilter { job: Some(16), ..scouts.clone() }.matches(&with(20)), "a job the advice does not weigh");
     }
 }

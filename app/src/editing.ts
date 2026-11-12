@@ -3,6 +3,8 @@
 import { call } from "./api";
 import { converts, toPounds, toShown } from "./currency";
 import type {
+  StaffEndingKind,
+  StaffReleasePreview,
   ApplyReport,
   BatchUndo,
   CaptainRole,
@@ -91,6 +93,16 @@ export const freezeTeam = (club: number, team: number, kind: FreezeKind, frozen:
  * logged as one batch, undone with `undoBatch`; `applied` counts them.
  */
 export const maxAttributes = (uid: number) => call<MassReport>("max_attributes", { uid });
+
+/** How far Make WonderKid goes (see `make_wonderkid`). */
+export type WonderLevel = "prospect" | "wonderkid" | "generational";
+
+/**
+ * Makes the player a young talent of `level`: his potential and what makes a young player grow rise to it, nothing
+ * better is lowered, and his current ability stays. Logged as one batch, which `undoBatch` takes back.
+ */
+export const makeWonderkid = (uid: number, level: WonderLevel) =>
+  call<MassReport>("make_wonderkid", { uid, level });
 
 /**
  * Sets every attribute of the member of staff `id` to its best: 20. The changes are logged as one batch, undone with
@@ -258,6 +270,20 @@ export const planRelease = (uid: number) => call<ClubName>("plan_release", { uid
 export const releasePlayer = (uid: number) => call<LoggedChange>("release_player", { uid });
 
 /**
+ * Checks that the member of staff can be released, and works out what is left of his contract and what paying
+ * `amount` pounds (what is left, when not given) does to his club's balance. Nothing is written.
+ */
+export const planStaffRelease = (uid: number, amount?: number) =>
+  call<StaffReleasePreview>("plan_staff_release", { uid, amount });
+
+/**
+ * Releases the member of staff: on `terminate` his club pays what is left of his contract, on `mutual` the `amount`
+ * agreed, in pounds. Logged and undone like any change, the money with it.
+ */
+export const releaseStaff = (uid: number, kind: StaffEndingKind, amount?: number) =>
+  call<LoggedChange>("release_staff", { uid, kind, amount });
+
+/**
  * Points the player's tie `index` at another nation or club (by UID), and gives a training another homegrown rule;
  * what is left out stays. Logged and undone like any change.
  */
@@ -299,15 +325,15 @@ export const homegrownRules = () => call<number[]>("homegrown_rules");
  * names the clubs; the error says why he cannot. One who has no club is signed, as `job`, on a contract the app makes
  * on `terms`, which the answer says (`MovePreview.staffContract`).
  */
-export const planStaffMove = (uid: number, club: number, job?: number, terms?: MoveTerms) =>
-  call<MovePreview>("plan_staff_move", { uid, club, job, terms });
+export const planStaffMove = (uid: number, club: number, job?: number, terms?: MoveTerms, team?: number) =>
+  call<MovePreview>("plan_staff_move", { uid, club, job, terms, team });
 
 /**
  * Moves the member of staff to the club, as `job` if given (else in the departments he works in), or signs one who has
  * no club as `job` on `terms`; logged and undone like any change.
  */
-export const moveStaff = (uid: number, club: number, job?: number, terms?: MoveTerms) =>
-  call<LoggedChange>("move_staff", { uid, club, job, terms });
+export const moveStaff = (uid: number, club: number, job?: number, terms?: MoveTerms, team?: number) =>
+  call<LoggedChange>("move_staff", { uid, club, job, terms, team });
 
 /** Gives the member of staff another job at his club (a contract code); logged and undone like any change. */
 export const changeStaffJob = (uid: number, job: number) => call<LoggedChange>("change_staff_job", { uid, job });

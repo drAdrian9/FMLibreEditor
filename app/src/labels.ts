@@ -141,6 +141,8 @@ export const editText = strings.edit;
 /** The Changes view: what was written to the game this session. */
 export const changesText = strings.changes;
 
+export const adviceText = strings.advice;
+
 /** Mass editing: the button in the toolbar of a list and the dialog it opens. */
 export const massEditText = strings.massEdit;
 
@@ -161,6 +163,9 @@ export const recallText = strings.recall;
 
 /** Making a player's loan permanent: the dialog the Make permanent button in his profile opens. */
 export const permanentText = strings.permanent;
+
+/** Releasing a member of staff: the button in his profile and its dialog. */
+export const staffReleaseText = strings.staffRelease;
 
 /** A player's secondary nationalities and homegrown status: the group in his profile and its dialog. */
 export const tieText = strings.ties;

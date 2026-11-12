@@ -98,6 +98,8 @@ pub struct PlayerDetails {
     pub height_cm: u16,
     /// Asking price in pounds, when the club has set one.
     pub asking_price: Option<i32>,
+    /// The transfer value the game works out, in pounds; none where the layout does not place it.
+    pub value: Option<i32>,
     pub reputation: Reputation,
     pub international: International,
     /// Position ratings (1–20) by [`POSITIONS`] key; the summary's `positions` lists the playable ones.
@@ -305,6 +307,7 @@ pub fn read_player_details(
         summary: player.clone(),
         height_cm: u16_at(p.height),
         asking_price: (asking_price >= 0).then_some(asking_price),
+        value: p.transfer_value.map(|offset| u32_at(offset) as i32).filter(|&value| value >= 0),
         reputation: Reputation {
             home: u16_at(p.home_reputation),
             current: u16_at(p.current_reputation),

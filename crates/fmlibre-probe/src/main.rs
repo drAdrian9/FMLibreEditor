@@ -517,6 +517,15 @@ enum Command {
         #[command(flatten)]
         restore: RestoreArgs,
     },
+    /// The squad advice the app's Advisor gives for a club: its places, and the players suggested for each with how
+    /// likely they are to come. Reads only.
+    Advice {
+        /// The club's UID; the club the human manager runs when left out.
+        club: Option<u32>,
+        /// Every suggestion, not only those likely to come.
+        #[arg(long)]
+        all: bool,
+    },
     /// Swap two players between their clubs in the running game.
     Swap {
         /// The UID of one player.
@@ -1257,6 +1266,7 @@ fn run(cli: Cli) -> Result<()> {
             };
             tie_change(&session, uid, Some(TieAction::Add { tie, target, rule }), restore)
         }
+        Command::Advice { club, all } => advice(&connect(process, ArraySource::ProfileFirst)?, club, !all),
         Command::Swap { uid, other, restore } => {
             swap_players(&connect(process, ArraySource::ProfileFirst)?, uid, other, restore)
         }
@@ -3436,6 +3446,7 @@ impl PlayerFilterArgs {
             loan_listed: self.loan_listed,
             women: (self.women || self.men).then_some(self.women),
             attributes,
+            ..PlayerFilter::default()
         };
         let by = match self.sort.as_deref() {
             None => return Ok((filter, None)),
@@ -7066,6 +7077,58 @@ mod tests {
             assert_eq!(demangle(bytes), None, "{}", String::from_utf8_lossy(bytes));
         }
     }
+}
+
+/// Prints the Advisor's advice for `club`, or the human manager's: each place, how badly it wants someone, and the
+/// players suggested with how likely they are to come and why; `strict` keeps to those likely to.
+fn advice(session: &Session, club: Option<u32>, strict: bool) -> Result<()> {
+    use fmlibre_core::{AdviceOptions, ClubIndex, INTEREST_POOL, PlayerIndex, StaffIndex, advise, refine};
+    let players = PlayerIndex::new(session.players()?);
+    let staff = StaffIndex::new(session.staff()?);
+    let clubs = ClubIndex::new(session.clubs()?);
+    let human: Vec<u32> = staff.iter().filter(|s| s.is_human).filter_map(|s| s.club_uid).collect();
+    let uid = club.or_else(|| human.first().copied()).ok_or_else(|| anyhow::anyhow!("the save names no human club"))?;
+    let summary = clubs.get(uid).ok_or_else(|| anyhow::anyhow!("no club with UID {uid}"))?;
+    let squad: Vec<u32> = players.iter().filter(|p| p.club_uid == Some(uid)).map(|p| p.uid).collect();
+    let options = AdviceOptions { interested: strict, ..AdviceOptions::default() };
+    let wide = AdviceOptions {
+        per_role: if strict { options.per_role * INTEREST_POOL } else { options.per_role },
+        ..options.clone()
+    };
+    let mut advice = advise(summary, &squad, None, &players, &staff, &clubs, &human, session.game_date(), &wide);
+    advice.finances = session.club_details(summary).ok().flatten().and_then(|details| details.finances);
+    refine(&mut advice, |player| session.player_details(player).ok().flatten(), &options);
+    println!(
+        "{} (reputation {}): {} players, best XI level {}",
+        summary.name,
+        summary.reputation.unwrap_or(0),
+        advice.squad_size,
+        advice.level
+    );
+    for role in &advice.roles {
+        println!(
+            "\n{:>4}  {:?}, best {}, wanting CA {}+: {} suggested",
+            role.key,
+            role.need,
+            role.best_ability.map_or("-".to_owned(), |ca| ca.to_string()),
+            role.target_ability,
+            role.candidates.len()
+        );
+        for c in &role.candidates {
+            println!(
+                "      {:<26} {:>3} CA {:>3} rep {:>5}  {:<24} {:?}  + {:?}  - {:?}",
+                c.player.name,
+                c.player.age.unwrap_or(0),
+                c.player.current_ability,
+                c.player.reputation,
+                c.player.club.as_deref().unwrap_or("(free agent)"),
+                c.interest,
+                c.pros,
+                c.cons
+            );
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
