@@ -1159,6 +1159,7 @@ mod tests {
             position_ratings[POSITIONS.iter().position(|p| *p == key).expect("a position")] = rating;
         }
         PlayerSummary {
+            id: None,
             uid,
             name: format!("Player {uid}"),
             full_name: None,

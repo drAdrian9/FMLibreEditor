@@ -329,6 +329,7 @@ mod tests {
         let mut position_ratings = [1u8; 15];
         position_ratings[12] = st;
         PlayerSummary {
+            id: None,
             uid: 1,
             name: name.to_owned(),
             full_name: None,

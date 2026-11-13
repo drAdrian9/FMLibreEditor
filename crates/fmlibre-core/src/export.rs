@@ -895,6 +895,7 @@ mod tests {
 
     fn saka() -> PlayerDetails {
         let summary = PlayerSummary {
+            id: None,
             uid: 28122642,
             name: "Bukayo Saka".to_owned(),
             full_name: Some("Bukayo Ayoyinka Saka".to_owned()),
