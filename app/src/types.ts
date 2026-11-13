@@ -1422,3 +1422,95 @@ export interface ClubAdvice {
   roleFits: RoleFit[];
   staff: StaffAdvice[];
 }
+
+/** The kind of competition a player's season is split by (see `season.rs`). */
+export type CompetitionKind = "league" | "cup" | "continental" | "international";
+
+/** The broad role a player's best position gives him, which his numbers are compared within. */
+export type PositionGroup =
+  | "goalkeeper"
+  | "centreBack"
+  | "fullBack"
+  | "defensiveMidfielder"
+  | "centralMidfielder"
+  | "winger"
+  | "attackingMidfielder"
+  | "striker";
+
+/** A player's statistics in one competition, or added up over several (see `SeasonStats` in `season.rs`). */
+export interface SeasonStats {
+  appearances: number;
+  /** Appearances off the bench; the others are starts. */
+  substitute: number;
+  /** The appearances that got a match rating, and the ratings added up in tenths. */
+  rated: number;
+  ratingTenths: number;
+  minutes: number;
+  goals: number;
+  assists: number;
+  conceded: number;
+  expectedGoals: number;
+  expectedAssists: number;
+  nonPenaltyExpectedGoals: number;
+  passes: number;
+  passesCompleted: number;
+  progressivePasses: number;
+  keyPasses: number;
+  openPlayKeyPasses: number;
+  clearCutChances: number;
+  shots: number;
+  shotsOnTarget: number;
+  dribbles: number;
+  headers: number;
+  headersWon: number;
+  tackles: number;
+  tacklesWon: number;
+  keyTackles: number;
+  interceptions: number;
+  clearances: number;
+  blocks: number;
+  possessionWon: number;
+  possessionLost: number;
+  pressures: number;
+  pressuresWon: number;
+  /** Hundreds of metres. */
+  distance: number;
+  sprints: number;
+  fouls: number;
+  foulsAgainst: number;
+  yellowCards: number;
+  redCards: number;
+  playerOfTheMatch: number;
+}
+
+/** A team that a player's statistics name: a club's, or a nation's. */
+export interface SeasonTeam {
+  name: string;
+  national: boolean;
+  /** 0 for a club's first team; the oldest its players may be, 100 for no limit. */
+  kind: number;
+  ageLimit: number;
+}
+
+/** A player's statistics in one competition, for one team. */
+export interface SeasonLine {
+  competition: string;
+  competitionFullName: string;
+  kind: CompetitionKind;
+  team: SeasonTeam | null;
+  stats: SeasonStats;
+}
+
+/** The players of his league a player is compared with, each one's statistics there. */
+export interface SeasonComparison {
+  competition: string;
+  group: PositionGroup;
+  minMinutes: number;
+  pool: SeasonStats[];
+}
+
+/** From `player_season`: a line per competition, the most minutes first, and whom he is compared with. */
+export interface PlayerSeason {
+  lines: SeasonLine[];
+  comparison: SeasonComparison | null;
+}

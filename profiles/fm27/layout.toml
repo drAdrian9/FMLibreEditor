@@ -9,6 +9,7 @@ edition = 27
 
 [player]
 uid = 0x294               # u32
+id = 0x290                # u32, the game's own id of the person, which its season statistics name him by (Rafael William: 26043)
 full_name = 0x2C8         # FM string pointer; may be null
 first_name = 0x2D8        # name-table entry pointer
 last_name = 0x2E0         # name-table entry pointer
@@ -373,6 +374,7 @@ monthly_fee = 0xCC
 unused_fee = 0xD0
 
 [team]
+id = 0x08                 # u32, the team's id, which the season statistics name it by (Persija's lines name it)
 club = 0x30               # club pointer
 # u8, the kind of team: on the test save 0 for the first team, 10 for the under-21s and
 # 12 for the under-18s (Manchester United).
@@ -509,3 +511,71 @@ win = 0x148               # u32 pounds per win
 win_again = 0x14C         # u32, the same as `win` in every settings seen
 draw = 0x150              # u32 pounds per draw
 loss = 0x154              # u32 pounds per loss
+
+# The season's statistics: a GAME_COMP_STATS object for each competition the game keeps them
+# for, found by its class, with a record of 0xAC bytes for each player who has played in it.
+# On the Mac build; the Windows Steam build 26577676 (Persija save, March 2028) was read the same. Checked on the Mac
+# save against FMRTE's season figures for Arda Güler (Arsenal, 15 November
+# 2026): 16 appearances in the Premier League, the Champions League, the Carabao Cup and the
+# Community Shield, 1,021 minutes, 25 shots, 47 pressures. See docs/recon/fm27-season-stats.md.
+[season]
+competition = 0x7B8       # pointer to the db::COMP
+players = 0x1278          # (begin, end) of pointers to the players' records
+table = 0x12A8            # (begin, end) of the league table's rows; empty for a cup
+teams = 0x12C0            # (begin, end) of the teams' records; empty for a stage of another competition
+
+# db::COMP, the competition.
+[season.comp]
+name = 0x40               # FM string pointer: "English FA Cup"
+short_name = 0x48         # "FA Cup"
+nation = 0x60             # nation pointer of a domestic competition; null for the others
+game = 0xB0               # pointer to the game's object for it: sicomps::ACTUAL_COMP or a subclass
+
+# What a national team points at where a club team points at its club, and its nation.
+[season.national]
+nation = 0x170
+
+# A player's record. Counts are u16 unless noted; the expected values are f32.
+[season.record]
+size = 0xAC
+person = 0x00             # u32, the person's id (player `id`)
+team = 0x04               # u32, the id of the team he played for
+rating = 0x08             # u16, his match ratings added up, in tenths
+appearances = 0x0A        # u8
+rated = 0x0B              # u8, the appearances that got a rating
+goals = 0x0C              # u8
+conceded = 0x0D           # u8, goals let in as goalkeeper
+expected_goals = 0x18
+expected_assists = 0x1C
+non_penalty_expected_goals = 0x24
+minutes = 0x34
+passes = 0x38
+passes_completed = 0x3A
+tackles = 0x3C
+tackles_won = 0x3E
+dribbles = 0x40
+shots = 0x42
+shots_on_target = 0x44
+fouls = 0x46
+fouls_against = 0x48
+distance = 0x4A           # hundreds of metres
+key_passes = 0x58
+key_tackles = 0x5A
+interceptions = 0x5E
+headers = 0x68
+headers_won = 0x6A
+clear_cut_chances = 0x70
+blocks = 0x72
+possession_won = 0x76
+possession_lost = 0x78
+clearances = 0x7A
+progressive_passes = 0x7E
+sprints = 0x80
+pressures = 0x82
+pressures_won = 0x84
+open_play_key_passes = 0x86
+substitute = 0x95         # u8, appearances off the bench
+assists = 0x9A            # u8
+yellow_cards = 0x9F       # u8
+red_cards = 0xA0          # u8
+player_of_the_match = 0xA1 # u8

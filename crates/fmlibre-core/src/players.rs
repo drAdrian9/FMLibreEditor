@@ -15,6 +15,10 @@ use crate::text::{Memo, display_name, is_name_like, read_fm_string, read_name_en
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerSummary {
+    /// The game's own id of the person, which the season's statistics name him by; `None` where the layout does not
+    /// place it.
+    #[serde(skip)]
+    pub id: Option<u32>,
     pub uid: u32,
     /// Display name: the common name if set, otherwise first and last name.
     pub name: String,
@@ -181,6 +185,7 @@ pub fn read_players(
         let wage = has_contract.then(|| {
             i32::from_le_bytes(contract_buf[c.wage as usize..c.wage as usize + 4].try_into().expect("4 bytes"))
         });
+        let id = p.id.map(u32_at);
         let asking_price = Some(u32_at(p.asking_price) as i32).filter(|&price| price >= 0);
         let value = p.transfer_value.map(|offset| u32_at(offset) as i32).filter(|&value| value >= 0);
         players.push(PlayerSummary {
@@ -207,6 +212,7 @@ pub fn read_players(
             reputation: u16_at(p.current_reputation),
             wage,
             asking_price,
+            id,
             value,
             address: object,
             shift,

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AttributeActions } from "./AttributeActions";
 import { ClauseList } from "./ClauseList";
@@ -7,7 +7,8 @@ import { EditableValue, EditInput } from "./EditControls";
 import { call } from "./api";
 import { keepPlaying } from "./editing";
 import { describeError, formatDate, formatNumber, formatMoney } from "./format";
-import { ATTRIBUTE_LABELS, editText, profileText, type AttributeKey } from "./labels";
+import { ATTRIBUTE_LABELS, editText, profileText, seasonText, type AttributeKey } from "./labels";
+import { SeasonTab } from "./SeasonTab";
 import { MedicalGroup } from "./MedicalGroup";
 import { MoveButton } from "./MoveDialog";
 import { ClubLogo, NationFlag, PersonFace, PICTURE_SIZE, WithPicture } from "./Picture";
@@ -88,6 +89,10 @@ export function PlayerProfile({ player, version, onClose, comparison, modal }: P
   const info = details ?? player;
   // The birth date and the height, like the nationality above them and the abilities, are inputs where they are shown
   // while the player is edited.
+  // The Season tab, beside the profile: not while the player is edited, whose inputs are on the profile.
+  const [tab, setTab] = useState<"profile" | "season">("profile");
+  const base = useId();
+  const shown = editing.stage !== "view" ? "profile" : tab;
   const vitals = [
     info.dateOfBirth && <Born dateOfBirth={info.dateOfBirth} age={info.age} />,
     details && details.heightCm > 0 && <Height cm={details.heightCm} />,
@@ -127,6 +132,29 @@ export function PlayerProfile({ player, version, onClose, comparison, modal }: P
       onClose={onClose}
       editing={editing}
       modal={modal}
+      wide={details !== undefined && shown === "season"}
+      tabs={
+        details && (
+          <div className="profile-tabs" role="tablist" aria-label={seasonText.tabsLabel}>
+            {(["profile", "season"] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`${base}-${id}`}
+                className="profile-tab"
+                aria-selected={id === shown}
+                aria-controls={`${base}-panel`}
+                disabled={id === "season" && editing.stage !== "view"}
+                title={id === "season" && editing.stage !== "view" ? seasonText.locked : undefined}
+                onClick={() => setTab(id)}
+              >
+                {seasonText.tabs[id]}
+              </button>
+            ))}
+          </div>
+        )
+      }
       actions={
         <>
           {/* Only while the profile is read, not edited. The Transfer dialog starts from his contract, so its button
@@ -147,7 +175,12 @@ export function PlayerProfile({ player, version, onClose, comparison, modal }: P
         </>
       }
     >
-      {details && <ProfileBody details={details} />}
+      {details &&
+        (shown === "season" ? (
+          <SeasonTab uid={info.uid} version={version} panel={{ id: `${base}-panel`, labelledBy: `${base}-season` }} />
+        ) : (
+          <ProfileBody details={details} />
+        ))}
     </ProfileFrame>
   );
 }

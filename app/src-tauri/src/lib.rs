@@ -2,7 +2,7 @@ mod bridge;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use fmlibre_core::{
@@ -38,7 +38,11 @@ const EXPORTS_FOLDER: &str = "FMLIBRE_EXPORTS";
 
 /// The connected game, the people read from it and the changes written this session.
 struct Connection {
-    session: Session,
+    /// Shared, so that the season's statistics can be read without holding the connection (see `player_season`).
+    session: Arc<Session>,
+    /// The season's statistics of every player, read the first time a player's are asked for; `None` inside when this
+    /// build's cannot be read.
+    season: Arc<OnceLock<Option<fmlibre_core::SeasonIndex>>>,
     players: PlayerIndex,
     staff: StaffIndex,
     clubs: ClubIndex,
@@ -377,7 +381,7 @@ struct PendingMass {
 impl Connection {
     /// Reads every list. A reload keeps the change log; a mass edit previewed before is dropped,
     /// since its people may have moved. Nothing is frozen yet.
-    fn load(session: Session, log: Vec<LoggedChange>) -> Result<Self, Failure> {
+    fn load(session: Arc<Session>, log: Vec<LoggedChange>) -> Result<Self, Failure> {
         // The game may have loaded a save or moved on since the checks last ran; the date the lists' ages are worked
         // out from is one of them.
         session.recheck();
@@ -398,7 +402,21 @@ impl Connection {
             checked: Some(Instant::now()),
             ..ClubsSeen::unknown(begin, session.loads())
         };
-        Ok(Self { session, players, staff, clubs, human_clubs, log, mass: None, next_id, frozen, save, clubs_seen })
+        let season = Arc::default();
+        Ok(Self {
+            session,
+            players,
+            staff,
+            clubs,
+            human_clubs,
+            log,
+            mass: None,
+            next_id,
+            frozen,
+            save,
+            clubs_seen,
+            season,
+        })
     }
 
     /// Freezes again what was frozen in this save before, as the file at `path` remembers it: the attributes, energy,
@@ -2260,7 +2278,8 @@ async fn connect(state: State<'_, AppState>, file: State<'_, FrozenFile>) -> Res
     let (connection, refrozen) = tauri::async_runtime::spawn_blocking(move || -> Result<_, Failure> {
         let pid = find_game(None)?;
         let process = Process::open_read_write(pid).or_else(|_| Process::open_read(pid))?;
-        let mut connection = Connection::load(Session::connect(process, ArraySource::ProfileFirst)?, Vec::new())?;
+        let mut connection =
+            Connection::load(Arc::new(Session::connect(process, ArraySource::ProfileFirst)?), Vec::new())?;
         let refrozen = connection.restore_frozen(path.as_deref());
         Ok((connection, refrozen))
     })
@@ -2310,7 +2329,14 @@ async fn reload(state: State<'_, AppState>, file: State<'_, FrozenFile>) -> Resu
     let (connection, refrozen) = tauri::async_runtime::spawn_blocking(move || -> Result<_, Failure> {
         let (save, frozen) = (old.save, old.frozen);
         let mut session = old.session;
-        session.find_missing_arrays();
+        // The season's statistics may still be being read with it; the lists are read again once that is done.
+        let Some(unique) = Arc::get_mut(&mut session) else {
+            return Err(Failure::new(
+                "app.busy",
+                "The season's statistics are still being read; reload again in a moment.",
+            ));
+        };
+        unique.find_missing_arrays();
         let mut connection = Connection::load(session, old.log)?;
         if connection.save == save {
             connection.frozen = frozen;
@@ -3344,6 +3370,54 @@ async fn release_player(app: tauri::AppHandle, uid: u32) -> Result<LoggedChange,
     .await?
 }
 
+/// A player's season: his statistics in each competition, and the players of his league he is compared with.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlayerSeason {
+    lines: Vec<fmlibre_core::SeasonLine>,
+    comparison: Option<fmlibre_core::SeasonComparison>,
+}
+
+/// The season's statistics of this build are not placed, or were not found.
+fn no_season() -> Failure {
+    Failure::new(
+        "season.unavailable",
+        "FMLibreEditor cannot read the season's statistics of this build of the game yet.",
+    )
+}
+
+/// The season's statistics of the player with `uid`. The first call reads every player's, which takes some seconds,
+/// outside the connection's lock so that the lists stay usable meanwhile; calls made during it wait for that read.
+/// Only reads memory.
+#[tauri::command]
+async fn player_season(state: State<'_, AppState>, uid: u32) -> Result<PlayerSeason, Failure> {
+    let (session, season) = {
+        let guard = state.0.lock()?;
+        let connection = guard.as_ref().ok_or_else(not_connected)?;
+        (connection.session.clone(), connection.season.clone())
+    };
+    let reader = season.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        reader.get_or_init(|| session.season());
+    })
+    .await?;
+    let season = season.get().and_then(Option::as_ref).ok_or_else(no_season)?;
+
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let player = connection.players.get(uid).ok_or_else(|| not_found(Entity::Player, uid))?;
+    let id = player.id.ok_or_else(no_season)?;
+    let comparison = fmlibre_core::PositionGroup::of(&player.position_ratings).and_then(|group| {
+        let groups: std::collections::HashMap<u32, fmlibre_core::PositionGroup> = connection
+            .players
+            .iter()
+            .filter_map(|p| Some((p.id?, fmlibre_core::PositionGroup::of(&p.position_ratings)?)))
+            .collect();
+        season.comparison(id, group, |person| groups.get(&person).copied())
+    });
+    Ok(PlayerSeason { lines: season.lines(id), comparison })
+}
+
 /// Checks that the member of staff `uid` can move to the club `club`, as `job` if given (else in his own job), and
 /// names the clubs; the error says why he cannot. One who has no club is signed, as `job`, on a contract the editor
 /// makes on `terms`, which the answer says. Nothing is written.
@@ -4234,6 +4308,7 @@ pub fn run() {
             move_staff,
             plan_staff_release,
             club_staff,
+            player_season,
             release_staff,
             change_staff_job,
             staff_jobs,

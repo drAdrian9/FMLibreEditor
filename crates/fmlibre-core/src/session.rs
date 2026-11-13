@@ -427,6 +427,12 @@ impl Session {
 
     /// The current in-game date, read now where the checks found it (see [`Check::GameDate`]); `None` rather than a
     /// date read from the wrong place.
+    /// Reads the season's statistics of every player; `None` where this build's are not placed or found. Takes a
+    /// second or two (see `season.rs`). Only reads memory.
+    pub fn season(&self) -> Option<crate::season::SeasonIndex> {
+        crate::season::read_season(&self.process, &self.plugin, &self.layout)
+    }
+
     pub fn game_date(&self) -> Option<FmDate> {
         self.read_date_at(self.health().date?.rva)
     }

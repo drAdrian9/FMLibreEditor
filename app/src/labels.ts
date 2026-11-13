@@ -170,6 +170,9 @@ export const staffReleaseText = strings.staffRelease;
 /** A player's secondary nationalities and homegrown status: the group in his profile and its dialog. */
 export const tieText = strings.ties;
 
+/** A player's season: the Season tab of his profile. */
+export const seasonText = strings.season;
+
 /** A contract's bonuses and clauses: the button under them in the profile and its dialog. */
 export const clauseText = strings.clauses;
 

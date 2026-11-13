@@ -287,6 +287,8 @@ const errors: ErrorTexts = {
   "relation.same": () => "El jugador ya tiene eso.",
   "relation.rule": (p) => `La regla de formación local ${p.rule} no es de las que escribe el editor.`,
   "staff.you": () => "Eres tú, el mánager que controlas.",
+  "season.unavailable": () =>
+    "FMLibreEditor aún no puede leer las estadísticas de la temporada de esta versión del juego.",
   "staff.unemployed": () => "Este miembro del personal no tiene club.",
   "staff.role": () =>
     "El club o uno de sus equipos apunta directamente a este miembro del personal (como a un mánager que también es " +
@@ -2156,6 +2158,125 @@ export const es: Strings = {
     hint: "Nada cambia en el juego hasta que confirmes.",
     releasing: "Rescindiendo…",
     cancel: "Cancelar",
+  },
+
+  season: {
+    tabsLabel: "Secciones del jugador",
+    tabs: { profile: "Perfil", season: "Temporada" },
+    locked: "Termina de editar para abrir la temporada",
+    loading: "Leyendo las estadísticas de la temporada…",
+    failed: (reason) => `No se ha podido leer la temporada: ${reason}`,
+    empty: "Aún no ha jugado esta temporada.",
+
+    // Las competiciones que se muestran
+    scopesLabel: "Competiciones",
+    scopes: {
+      all: "Todas las competiciones de club",
+      league: "Liga",
+      cup: "Copas",
+      continental: "Continentales",
+      international: "Internacional",
+    },
+    kindCount: {
+      league: (count) => `${format(count)} de liga`,
+      cup: (count) => `${format(count)} de copa`,
+      continental: (count) => (count === 1 ? "1 continental" : `${format(count)} continentales`),
+      international: (count) => (count === 1 ? "1 internacional" : `${format(count)} internacionales`),
+    },
+
+    // Las cifras de arriba
+    appearances: "Partidos",
+    starts: "Titular",
+    offBench: (count) => `${format(count)} como suplente`,
+    minutes: "Minutos",
+    minutesPerGoal: (minutes) => `un gol cada ${format(minutes)} min`,
+    goals: "Goles",
+    assists: "Asistencias",
+    expectedGoals: (value) => `xG ${value}`,
+    expectedAssists: (value) => `xA ${value}`,
+    rating: "Valoración media",
+    rated: (count) => (count === 1 ? "1 partido valorado" : `${format(count)} partidos valorados`),
+    playerOfTheMatch: "Jugador del partido",
+    cards: "Tarjetas",
+    cardsValue: (yellow, red) =>
+      `${yellow === 1 ? "1 amarilla" : `${yellow} amarillas`} · ${red === 1 ? "1 roja" : `${red} rojas`}`,
+    fouls: (made, won) =>
+      `${made === 1 ? "1 falta" : `${format(made)} faltas`} · ${won === 1 ? "1 recibida" : `${format(won)} recibidas`}`,
+
+    // Los grupos
+    groups: {
+      creation: "Creación",
+      finishing: "Finalización",
+      duels: "Duelos y seguridad con el balón",
+      defending: "Defensa",
+      pressing: "Presión y esfuerzo",
+    },
+    total: "Temporada",
+    per90: "Por 90",
+    percentile: "Percentil",
+    rows: {
+      assists: "Asistencias",
+      expectedAssists: "Asistencias esperadas (xA)",
+      keyPasses: "Pases clave",
+      openPlayKeyPasses: "Pases clave en juego abierto",
+      clearCutChances: "Ocasiones claras creadas",
+      passCompletion: "Pases completados",
+      progressivePasses: "Pases progresivos",
+      goals: "Goles",
+      expectedGoals: "Goles esperados (xG)",
+      nonPenaltyExpectedGoals: "xG sin penaltis",
+      shots: "Tiros",
+      shotsOnTarget: "Tiros a puerta",
+      expectedGoalsPerShot: "xG sin penaltis por tiro",
+      conversion: "Tiros convertidos",
+      headersWon: "Duelos aéreos ganados",
+      tacklesWon: "Entradas ganadas",
+      dribbles: "Regates",
+      possessionLost: "Pérdidas de balón",
+      foulsWon: "Faltas recibidas",
+      fouls: "Faltas cometidas",
+      interceptions: "Intercepciones",
+      clearances: "Despejes",
+      blocks: "Bloqueos",
+      keyTackles: "Entradas clave",
+      possessionWon: "Recuperaciones",
+      pressures: "Presiones exitosas",
+      distance: "Distancia recorrida",
+      sprints: "Esprints",
+    },
+    of: (part, whole) => `${format(part)} de ${format(whole)}`,
+    km: (km) => `${km} km`,
+    percentileTitle: (percentile) => `Por encima del ${percentile}\u00a0% de los jugadores comparados`,
+    lowerIsBetter: "cuanto más bajo, mejor",
+    compared: (count, group, competition, minutes) =>
+      `Los percentiles comparan los valores por 90 minutos y los porcentajes con ${format(count)} ${group} ` +
+      `(${competition}, ${format(minutes)} minutos o más).`,
+    groupNames: {
+      goalkeeper: "porteros",
+      centreBack: "centrales",
+      fullBack: "laterales",
+      defensiveMidfielder: "mediocentros defensivos",
+      centralMidfielder: "mediocentros",
+      winger: "extremos",
+      attackingMidfielder: "mediapuntas",
+      striker: "delanteros",
+    },
+    notCompared: "Aún no hay percentiles: pocos jugadores de su posición han jugado lo suficiente en la liga.",
+
+    // La tabla
+    tableLabel: "Temporada por competición",
+    columns: {
+      competition: "Competición",
+      appearances: "PJ",
+      minutes: "Min",
+      goals: "Gol",
+      assists: "Asis",
+      expectedGoals: "xG",
+      expectedAssists: "xA",
+      rating: "Val",
+    },
+    teamAge: (team, limit) => `${team} Sub-${limit}`,
+    substitutes: (count) => `(${count})`,
   },
 
   squad: {

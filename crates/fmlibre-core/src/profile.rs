@@ -56,6 +56,102 @@ pub struct Layout {
     /// The prize money a competition's stages pay (see `prize_money.rs`); only in the layouts it has been checked in.
     #[serde(default)]
     pub prize_money: Option<PrizeMoneyLayout>,
+    /// The season's statistics; only in the layouts they have been checked in.
+    #[serde(default)]
+    pub season: Option<SeasonLayout>,
+}
+
+/// The season's statistics the game keeps per competition: one `GAME_COMP_STATS` object for each, found by its class
+/// (see `season.rs`), with a record for every player who has played in it.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeasonLayout {
+    /// Pointer to the competition (`db::COMP`).
+    pub competition: u64,
+    /// `(begin, end)` of pointers to the players' records.
+    pub players: u64,
+    /// `(begin, end)` of the league table's rows; empty for a cup.
+    pub table: u64,
+    /// `(begin, end)` of the teams' records; empty for a stage of another competition, whose players' records the
+    /// competition itself holds again.
+    pub teams: u64,
+    pub comp: SeasonCompLayout,
+    pub national: SeasonNationalLayout,
+    pub record: SeasonRecordLayout,
+}
+
+/// A competition (`db::COMP`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeasonCompLayout {
+    /// FM string pointers: the full name, and the one the game shows in lists.
+    pub name: u64,
+    pub short_name: u64,
+    /// Pointer to the nation of a domestic competition; null for continental and international ones.
+    pub nation: u64,
+    /// Pointer to the game's own object for the competition, whose class tells a friendly or a reserve league.
+    pub game: u64,
+}
+
+/// A national team, which points at its container where a club team points at its club.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeasonNationalLayout {
+    /// In the container: the pointer to the nation.
+    pub nation: u64,
+}
+
+/// A player's record of one competition. Counts are `u16` unless noted; the expected values are `f32`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeasonRecordLayout {
+    pub size: u64,
+    /// `u32`: the person's id (see [`PlayerLayout::id`]) and the team's (see [`TeamLayout::id`]).
+    pub person: u64,
+    pub team: u64,
+    /// His match ratings added up, in tenths.
+    pub rating: u64,
+    /// `u8`: appearances, those that got a rating, goals and goals let in as goalkeeper.
+    pub appearances: u64,
+    pub rated: u64,
+    pub goals: u64,
+    pub conceded: u64,
+    pub expected_goals: u64,
+    pub expected_assists: u64,
+    pub non_penalty_expected_goals: u64,
+    pub minutes: u64,
+    pub passes: u64,
+    pub passes_completed: u64,
+    pub tackles: u64,
+    pub tackles_won: u64,
+    pub dribbles: u64,
+    pub shots: u64,
+    pub shots_on_target: u64,
+    pub fouls: u64,
+    pub fouls_against: u64,
+    /// In hundreds of metres.
+    pub distance: u64,
+    pub key_passes: u64,
+    pub key_tackles: u64,
+    pub interceptions: u64,
+    pub headers: u64,
+    pub headers_won: u64,
+    pub clear_cut_chances: u64,
+    pub blocks: u64,
+    pub possession_won: u64,
+    pub possession_lost: u64,
+    pub clearances: u64,
+    pub progressive_passes: u64,
+    pub sprints: u64,
+    pub pressures: u64,
+    pub pressures_won: u64,
+    pub open_play_key_passes: u64,
+    /// `u8`: appearances off the bench, assists, cards and Player of the Match awards.
+    pub substitute: u64,
+    pub assists: u64,
+    pub yellow_cards: u64,
+    pub red_cards: u64,
+    pub player_of_the_match: u64,
 }
 
 /// The game's one object of its class (`game_plugin::GAME_UI` in FM27), made when the game starts and kept until it
@@ -363,6 +459,10 @@ impl BanLayout {
 #[serde(deny_unknown_fields)]
 pub struct PlayerLayout {
     pub uid: u64,
+    /// `u32`: the game's own id of the person, which the season's statistics name him by; only where it has been
+    /// checked.
+    #[serde(default)]
+    pub id: Option<u64>,
     pub full_name: u64,
     pub first_name: u64,
     pub last_name: u64,
@@ -622,6 +722,9 @@ impl StaffLayout {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TeamLayout {
+    /// `u32`: the team's id, which the season's statistics name it by; only where it has been checked.
+    #[serde(default)]
+    pub id: Option<u64>,
     pub club: u64,
     /// `u8`: the kind of team, 0 for the first team.
     pub kind: u64,

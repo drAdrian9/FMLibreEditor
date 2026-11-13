@@ -5,6 +5,9 @@ import { dateFromNumber, numberFromDate } from "../editing";
 import { fold } from "../format";
 import { scoutingOverview, scoutingSuggest } from "./mockScouting";
 import type {
+  PlayerSeason,
+  SeasonLine,
+  SeasonStats,
   StaffEndingKind,
   StaffReleasePreview,
   InterestReason,
@@ -870,6 +873,106 @@ function staffDetails(member: StaffSummary): StaffDetails {
           },
   });
 }
+
+/**
+ * A fixture season: about as much as `minutes` in each of a player's competitions, with counts per 90 that suit his
+ * position, scaled by his ability and drawn from `next`.
+ */
+function seasonStats(next: () => number, minutes: number, keeper: boolean, attacking: number): SeasonStats {
+  const appearances = Math.max(1, Math.round(minutes / 80));
+  const substitute = Math.min(appearances, Math.round(next() * appearances * 0.3));
+  const per90 = (rate: number) => Math.round((rate * (0.6 + next() * 0.8) * minutes) / 90);
+  const shots = keeper ? 0 : per90(0.6 + attacking * 2.4);
+  const goals = Math.min(shots, keeper ? 0 : per90(attacking * 0.45));
+  const passes = per90(keeper ? 28 : 40 + (1 - attacking) * 15);
+  const headers = per90(keeper ? 0.3 : 2 + (1 - attacking) * 3);
+  const tackles = per90(keeper ? 0 : 1 + (1 - attacking) * 2);
+  const pressures = per90(keeper ? 0 : 3 + attacking * 2);
+  const expectedGoals = keeper ? 0 : Math.round(shots * (0.08 + next() * 0.06) * 100) / 100;
+  return {
+    appearances,
+    substitute,
+    rated: appearances,
+    ratingTenths: Math.round(appearances * (64 + next() * 10)),
+    minutes,
+    goals,
+    assists: keeper ? 0 : per90(attacking * 0.3),
+    conceded: keeper ? per90(1.2) : 0,
+    expectedGoals,
+    expectedAssists: keeper ? 0 : Math.round(minutes * attacking * 0.0025 * (0.6 + next() * 0.8) * 100) / 100,
+    nonPenaltyExpectedGoals: expectedGoals,
+    passes,
+    passesCompleted: Math.round(passes * (0.72 + next() * 0.2)),
+    progressivePasses: per90(keeper ? 1 : 2 + (1 - attacking) * 2),
+    keyPasses: keeper ? 0 : per90(0.3 + attacking * 1.6),
+    openPlayKeyPasses: keeper ? 0 : per90(0.2 + attacking * 1.3),
+    clearCutChances: keeper ? 0 : per90(attacking * 0.3),
+    shots,
+    shotsOnTarget: Math.round(shots * (0.3 + next() * 0.25)),
+    dribbles: keeper ? 0 : per90(attacking * 1.8),
+    headers,
+    headersWon: Math.round(headers * (0.3 + next() * 0.4)),
+    tackles,
+    tacklesWon: Math.round(tackles * (0.6 + next() * 0.3)),
+    keyTackles: keeper ? 0 : per90(0.08),
+    interceptions: keeper ? per90(0.2) : per90(0.8 + (1 - attacking) * 1.5),
+    clearances: per90(keeper ? 1 : 0.3 + (1 - attacking) * 3),
+    blocks: keeper ? 0 : per90(0.3 + (1 - attacking) * 0.6),
+    possessionWon: per90(keeper ? 2 : 4 + (1 - attacking) * 3),
+    possessionLost: per90(keeper ? 3 : 6 + attacking * 5),
+    pressures,
+    pressuresWon: Math.round(pressures * (0.2 + next() * 0.15)),
+    distance: Math.round(((keeper ? 55 : 105 + next() * 25) * minutes) / 90),
+    sprints: per90(keeper ? 1 : 6 + attacking * 5),
+    fouls: per90(keeper ? 0.05 : 0.8 + (1 - attacking) * 0.5),
+    foulsAgainst: per90(keeper ? 0.1 : 0.6 + attacking * 0.8),
+    yellowCards: Math.round(next() * appearances * 0.15),
+    redCards: next() < 0.05 ? 1 : 0,
+    playerOfTheMatch: Math.round(next() * appearances * 0.15),
+  };
+}
+
+/** How attacking a fixture player's best position is, 0 (goalkeeper, centre-back) to 1 (striker). */
+function attackingOf(player: PlayerSummary): number {
+  const best = player.positions[0] ?? "dc";
+  const scale: Record<string, number> = { st: 1, aml: 0.8, amc: 0.8, amr: 0.8, ml: 0.6, mr: 0.6, mc: 0.45, dm: 0.3 };
+  return scale[best] ?? (best === "dc" || best === "sw" || best === "gk" ? 0.1 : 0.25);
+}
+
+/** `player_season`: a fixture league, cups and Europe for a club's players, and an international line for some. */
+function seasonOf(player: PlayerSummary): PlayerSeason {
+  const next = random(player.uid ^ 0x2a2a);
+  const keeper = isKeeper(player.uid);
+  const attacking = attackingOf(player);
+  if (player.club === null) {
+    return { lines: [], comparison: null };
+  }
+  const team = { name: player.club, national: false, kind: 0, ageLimit: 100 };
+  const line = (competition: string, full: string, kind: SeasonLine["kind"], minutes: number): SeasonLine => ({
+    competition,
+    competitionFullName: full,
+    kind,
+    team,
+    stats: seasonStats(next, minutes, keeper, attacking),
+  });
+  const lines = [line("Premier Division", "Fixture Premier Division", "league", Math.round(300 + next() * 600))];
+  if (next() < 0.7) {
+    lines.push(line("League Cup", "Fixture League Cup", "cup", Math.round(60 + next() * 120)));
+  }
+  if (player.currentAbility > 150) {
+    lines.push(line("Champions Cup", "Fixture Champions Cup", "continental", Math.round(90 + next() * 270)));
+  }
+  if (player.nation && player.currentAbility > 140) {
+    const national = { name: player.nation, national: true, kind: 0, ageLimit: 100 };
+    lines.push({ ...line("Nations League", "Fixture Nations League", "international", 270), team: national });
+  }
+  const pool = Array.from({ length: 16 }, (_, i) =>
+    seasonStats(random(player.uid + i + 1), 450 + i * 30, keeper, attacking),
+  );
+  const group = keeper ? "goalkeeper" : "attackingMidfielder";
+  return { lines, comparison: { competition: "Premier Division", group, minMinutes: 450, pool } };
+}
+
 
 /** Each fixture person's current ability as generated: their made-up profile is built around it, edited or not. */
 const generatedAbility = new Map<number, number>([...players, ...staff].map((p) => [p.uid, p.currentAbility]));
@@ -3339,6 +3442,16 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       const report: MassReport = { batch: nextMassId++, applied: 0, failed: [] };
       setValues(player, ATTRIBUTES.map(bestAttribute), report);
       return report as T;
+    }
+    case "player_season": {
+      const uid = Number(args?.uid);
+      const player = players.find((p) => p.uid === uid);
+      if (!player) {
+        throw notFound("player", uid);
+      }
+      // Reading every player's statistics takes the game a moment the first time.
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return seasonOf(player) as T;
     }
     case "make_wonderkid": {
       const uid = Number(args?.uid);

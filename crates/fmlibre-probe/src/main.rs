@@ -74,6 +74,14 @@ enum BridgeAction {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Show a player's statistics this season, a line per competition.
+    Season {
+        /// The player's unique ID.
+        uid: u32,
+        /// Also list every competition the game keeps statistics for.
+        #[arg(long)]
+        competitions: bool,
+    },
     /// Show the process, storefront, modules and the layout of the game plugin (default).
     Info,
     /// Run the checks the editor makes before it writes, and show what each found.
@@ -1265,6 +1273,9 @@ fn run(cli: Cli) -> Result<()> {
                 TieArg::Permit => (Tie::WorkPermit, TieUid::Nation(target)),
             };
             tie_change(&session, uid, Some(TieAction::Add { tie, target, rule }), restore)
+        }
+        Command::Season { uid, competitions } => {
+            season(&Session::connect(process, ArraySource::ProfileFirst)?, uid, competitions)
         }
         Command::Advice { club, all } => advice(&connect(process, ArraySource::ProfileFirst)?, club, !all),
         Command::Swap { uid, other, restore } => {
@@ -7104,37 +7115,36 @@ fn advice(session: &Session, club: Option<u32>, strict: bool) -> Result<()> {
     advice.finances = session.club_details(summary).ok().flatten().and_then(|details| details.finances);
     refine(&mut advice, |player| session.player_details(player).ok().flatten(), &options);
     // The eleven by role fit for the tactic the manager plays.
-    if let Ok(tactics) = session.club_tactics(summary, &players) {
-        if let Some(tactic) = tactics.first() {
-            let places: Vec<fmlibre_core::TacticPlace> = tactic
-                .slots
-                .iter()
-                .filter_map(|slot| {
-                    let position = slot.position.or_else(|| (slot.index == 0).then_some("gk")).or_else(|| {
-                        let player = players.get(slot.player?)?;
-                        let best = (0..fmlibre_core::POSITIONS.len())
-                            .filter(|&i| fmlibre_core::POSITIONS[i] != "sw")
-                            .max_by_key(|&i| player.position_ratings[i])?;
-                        Some(fmlibre_core::POSITIONS[best])
-                    })?;
-                    Some((position, slot.in_possession, slot.out_of_possession))
-                })
-                .collect();
-            let members: Vec<&fmlibre_core::PlayerSummary> = squad.iter().filter_map(|&uid| players.get(uid)).collect();
-            println!("eleven by role fit ({} places):", places.len());
-            for place in fmlibre_core::tactic_eleven(&members, &places) {
-                let best: Vec<String> =
-                    place.best.iter().map(|f| format!("{} {}", f.player.name, f.fit)).collect();
-                println!(
-                    "  {:>4} {:<5} {:<5}  {:<24} {:>3}   best: {}",
-                    place.position,
-                    place.in_possession.unwrap_or("?"),
-                    place.out_of_possession.unwrap_or("?"),
-                    place.picked.as_ref().map_or("-".to_owned(), |f| f.player.name.clone()),
-                    place.picked.as_ref().map_or(0, |f| f.fit),
-                    best.join(", ")
-                );
-            }
+    if let Ok(tactics) = session.club_tactics(summary, &players)
+        && let Some(tactic) = tactics.first()
+    {
+        let places: Vec<fmlibre_core::TacticPlace> = tactic
+            .slots
+            .iter()
+            .filter_map(|slot| {
+                let position = slot.position.or_else(|| (slot.index == 0).then_some("gk")).or_else(|| {
+                    let player = players.get(slot.player?)?;
+                    let best = (0..fmlibre_core::POSITIONS.len())
+                        .filter(|&i| fmlibre_core::POSITIONS[i] != "sw")
+                        .max_by_key(|&i| player.position_ratings[i])?;
+                    Some(fmlibre_core::POSITIONS[best])
+                })?;
+                Some((position, slot.in_possession, slot.out_of_possession))
+            })
+            .collect();
+        let members: Vec<&fmlibre_core::PlayerSummary> = squad.iter().filter_map(|&uid| players.get(uid)).collect();
+        println!("eleven by role fit ({} places):", places.len());
+        for place in fmlibre_core::tactic_eleven(&members, &places) {
+            let best: Vec<String> = place.best.iter().map(|f| format!("{} {}", f.player.name, f.fit)).collect();
+            println!(
+                "  {:>4} {:<5} {:<5}  {:<24} {:>3}   best: {}",
+                place.position,
+                place.in_possession.unwrap_or("?"),
+                place.out_of_possession.unwrap_or("?"),
+                place.picked.as_ref().map_or("-".to_owned(), |f| f.player.name.clone()),
+                place.picked.as_ref().map_or(0, |f| f.fit),
+                best.join(", ")
+            );
         }
     }
     println!(
@@ -7216,4 +7226,63 @@ mod cohesion_tests {
         assert_eq!(most_named(&BTreeMap::from([(7, 2), (5, 2)])), Some((5, 2)));
         assert_eq!(most_named(&BTreeMap::new()), None);
     }
+}
+
+/// Prints a player's statistics this season, a line per competition.
+fn season(session: &Session, uid: u32, competitions: bool) -> Result<()> {
+    use fmlibre_core::{CompetitionKind, PlayerIndex, SeasonStats};
+    let index = PlayerIndex::new(session.players()?);
+    let player = index.get(uid).with_context(|| format!("no player with UID {uid}"))?;
+    let id = player.id.context("this build's layout does not place the players' ids")?;
+    let started = Instant::now();
+    let season = session.season().context("found no season statistics in this build")?;
+    println!(
+        "{} (UID {uid}, id {id}): read {} competitions' statistics in {:.1} s",
+        player.name,
+        season.competitions().len(),
+        started.elapsed().as_secs_f64()
+    );
+    if competitions {
+        for c in season.competitions() {
+            println!("    {} ({}): domestic {}, league {}", c.name, c.full_name, c.domestic, c.league);
+        }
+    }
+    if season.lines(id).is_empty() {
+        // Where the layout's id finds nothing, look for the u32 of his object that does: the place of the id.
+        let process = &session.process;
+        for offset in (0x200..0x480u64).step_by(4) {
+            let Ok(value) = process.read_u32(player.address + offset) else { continue };
+            let found = season.lines(value);
+            if !found.is_empty() {
+                println!("  his u32 at +{offset:#x} ({value}) names {} lines", found.len());
+            }
+        }
+    }
+    let mut all = SeasonStats::default();
+    for line in &season.lines(id) {
+        let s = &line.stats;
+        let team = line.team.as_ref().map_or("-", |team| team.name.as_str());
+        println!(
+            "  {:<28} {:<12} {:<18} {:>2} apps ({} sub) {:>4} min {} G {} A  xG {:.2} xA {:.2}  rating {:.2}",
+            line.competition,
+            format!("{:?}", line.kind),
+            team,
+            s.appearances,
+            s.substitute,
+            s.minutes,
+            s.goals,
+            s.assists,
+            s.expected_goals,
+            s.expected_assists,
+            f64::from(s.rating_tenths) / 10.0 / f64::from(s.rated.max(1)),
+        );
+        if line.kind != CompetitionKind::International {
+            all.add(s);
+        }
+    }
+    println!(
+        "  club competitions: {} apps, {} min, {} goals, {} assists",
+        all.appearances, all.minutes, all.goals, all.assists
+    );
+    Ok(())
 }

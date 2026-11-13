@@ -96,10 +96,15 @@ pub use profile::{
 pub use relations::{HOMEGROWN_RULES, Relation, RelationPlan, RelationSet, Tie, TieTarget};
 pub use retirement::{PlannedRetirement, RetirementPlan, RetirementSet};
 pub use scan::{ArrayCandidate, ScanOptions, VtableCount, scan_object_arrays};
+mod season;
 pub use scouting::{
     Buyer, ClubTactic, Fitting, LIKELY, Line, NOT_FOR_SALE, Phase, Purpose, ROLES, Reason, Role, SCOUT_POSITIONS,
     ScoutError, ScoutOrder, ScoutPosition, ScoutRequest, Scouted, Side, Suggestion, TacticSlot, measure_fit, role,
     role_of_mask, scout_position,
+};
+pub use season::{
+    Competition as SeasonCompetition, CompetitionKind, PositionGroup, SeasonComparison, SeasonIndex, SeasonLine,
+    SeasonStats, SeasonTeam, read_season,
 };
 pub use session::{ArraySource, IGNORE_PROFILES, SaveVouched, Session, SessionError, find_game, profiles_ignored};
 pub use signing::NewContract;

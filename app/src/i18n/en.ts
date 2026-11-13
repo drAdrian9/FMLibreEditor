@@ -14,6 +14,7 @@
 
 import type {
   CheckKey,
+  CompetitionKind,
   Entity,
   ExportEntity,
   ExportFormat,
@@ -21,6 +22,7 @@ import type {
   MassOperationKind,
   MassPreview,
   PlayerSort,
+  PositionGroup,
   SquadSort,
   StaffSort,
   Storefront,
@@ -2362,6 +2364,140 @@ export const en = {
     hint: "Nothing changes in the game until you confirm.",
     releasing: "Releasing…",
     cancel: "Cancel",
+  },
+
+  /**
+   * A player's season: the tab of the profile with the statistics the game keeps of each competition, the figures at
+   * the top, the groups with each value per 90 minutes and its percentile, and a table of the competitions.
+   */
+  season: {
+    /** The tabs of a player's profile: their names, and the list's for assistive technology. */
+    tabsLabel: "Player sections",
+    tabs: { profile: "Profile", season: "Season" },
+    /** Hover text of the Season tab while the player is edited: the values are on the Profile. */
+    locked: "Finish editing to open the season",
+    /** The first time, the app reads every player's statistics, which takes a second or two. */
+    loading: "Reading the season's statistics…",
+    failed: (reason: string) => `Could not read the season: ${reason}`,
+    empty: "No appearances this season yet.",
+
+    // The competitions shown
+    /** The name of the switch for assistive technology, and its choices. */
+    scopesLabel: "Competitions",
+    scopes: {
+      all: "All club competitions",
+      league: "League",
+      cup: "Cups",
+      continental: "Continental",
+      international: "International",
+    } satisfies Record<"all" | CompetitionKind, string>,
+    /** "10 league · 3 cup · 3 continental": the appearances of each kind. */
+    kindCount: {
+      league: (count: number) => `${format(count)} league`,
+      cup: (count: number) => `${format(count)} cup`,
+      continental: (count: number) => `${format(count)} continental`,
+      international: (count: number) => `${format(count)} international`,
+    } satisfies Record<CompetitionKind, (count: number) => string>,
+
+    // The figures at the top
+    appearances: "Appearances",
+    starts: "Starts",
+    offBench: (count: number) => `${format(count)} off the bench`,
+    minutes: "Minutes",
+    minutesPerGoal: (minutes: number) => `a goal every ${format(minutes)} min`,
+    goals: "Goals",
+    assists: "Assists",
+    /** Under goals and assists: what was expected of the chances, e.g. "xG 3.16". */
+    expectedGoals: (value: string) => `xG ${value}`,
+    expectedAssists: (value: string) => `xA ${value}`,
+    rating: "Average rating",
+    rated: (count: number) => (count === 1 ? "1 rated match" : `${format(count)} rated matches`),
+    playerOfTheMatch: "Player of the Match",
+    cards: "Cards",
+    cardsValue: (yellow: number, red: number) => `${yellow} yellow · ${red} red`,
+    fouls: (made: number, won: number) => `${format(made)} fouls · ${format(won)} won`,
+
+    // The groups
+    groups: {
+      creation: "Creation",
+      finishing: "Finishing",
+      duels: "Duels and ball security",
+      defending: "Defending",
+      pressing: "Pressing and work rate",
+    },
+    /** The heads of a group's columns, for assistive technology. */
+    total: "Season",
+    per90: "Per 90",
+    percentile: "Percentile",
+    rows: {
+      assists: "Assists",
+      expectedAssists: "Expected assists (xA)",
+      keyPasses: "Key passes",
+      openPlayKeyPasses: "Open-play key passes",
+      clearCutChances: "Clear-cut chances created",
+      passCompletion: "Passes completed",
+      progressivePasses: "Progressive passes",
+      goals: "Goals",
+      expectedGoals: "Expected goals (xG)",
+      nonPenaltyExpectedGoals: "Non-penalty xG",
+      shots: "Shots",
+      shotsOnTarget: "Shots on target",
+      expectedGoalsPerShot: "Non-penalty xG per shot",
+      conversion: "Shots scored",
+      headersWon: "Aerial duels won",
+      tacklesWon: "Tackles won",
+      dribbles: "Dribbles",
+      possessionLost: "Possession lost",
+      foulsWon: "Fouls won",
+      fouls: "Fouls made",
+      interceptions: "Interceptions",
+      clearances: "Clearances",
+      blocks: "Blocks",
+      keyTackles: "Key tackles",
+      possessionWon: "Possession won",
+      pressures: "Pressures completed",
+      distance: "Distance covered",
+      sprints: "Sprints",
+    },
+    /** "12 of 25": shots on target of shots, and the like. */
+    of: (part: number, whole: number) => `${format(part)} of ${format(whole)}`,
+    km: (km: string) => `${km} km`,
+    /** Hover text of a percentile: where the player stands among those compared. */
+    percentileTitle: (percentile: number) => `Higher than ${percentile}% of the players compared`,
+    /** After the name of a value where less is better, for assistive technology and as hover text. */
+    lowerIsBetter: "lower is better",
+    /** Under the groups: whom the percentiles compare the player with; `group` is one of `groupNames`. */
+    compared: (count: number, group: string, competition: string, minutes: number) =>
+      `Percentiles compare per-90 values and rates with ${format(count)} ${group} of the ${competition} who have ` +
+      `played ${format(minutes)} minutes or more of it.`,
+    groupNames: {
+      goalkeeper: "goalkeepers",
+      centreBack: "centre-backs",
+      fullBack: "full-backs",
+      defensiveMidfielder: "defensive midfielders",
+      centralMidfielder: "central midfielders",
+      winger: "wingers",
+      attackingMidfielder: "attacking midfielders",
+      striker: "strikers",
+    } satisfies Record<PositionGroup, string>,
+    notCompared: "No percentiles yet: too few players of this position have played enough of the league.",
+
+    // The table
+    tableLabel: "Season by competition",
+    columns: {
+      competition: "Competition",
+      appearances: "Apps",
+      minutes: "Min",
+      goals: "Gls",
+      assists: "Ast",
+      expectedGoals: "xG",
+      expectedAssists: "xA",
+      rating: "Av Rat",
+    },
+    /** A team that is not a club's first team or a nation's senior team: "Arsenal U21". */
+    teamAge: (team: string, limit: number) => `${team} U${limit}`,
+    /** After the appearances: those off the bench, "10 (2)". */
+    substitutes: (count: number) => `(${count})`,
   },
 
   /**

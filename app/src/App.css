@@ -460,7 +460,8 @@ dd,
 /* A segmented switch: two or three buttons in one frame; the pressed one is the choice in effect. The mode switch of
    the move dialog (see Moving a player) is one, and so is the switch between the teams of a squad (see Club squad). */
 .move-mode,
-.squad-teams {
+.squad-teams,
+.season-scopes {
   display: inline-flex;
   align-self: flex-start;
   overflow: hidden;
@@ -469,7 +470,8 @@ dd,
 }
 
 .move-mode button,
-.squad-teams button {
+.squad-teams button,
+.season-scopes button {
   min-width: 40px;
   min-height: 26px;
   padding: 3px 10px;
@@ -483,24 +485,28 @@ dd,
 }
 
 .move-mode button + button,
-.squad-teams button + button {
+.squad-teams button + button,
+.season-scopes button + button {
   border-left: 1px solid var(--border-strong);
 }
 
 .move-mode button:hover:not(:disabled, [aria-pressed="true"]),
-.squad-teams button:hover:not(:disabled, [aria-pressed="true"]) {
+.squad-teams button:hover:not(:disabled, [aria-pressed="true"]),
+.season-scopes button:hover:not(:disabled, [aria-pressed="true"]) {
   background: var(--hover);
   color: var(--text);
 }
 
 .move-mode button[aria-pressed="true"],
-.squad-teams button[aria-pressed="true"] {
+.squad-teams button[aria-pressed="true"],
+.season-scopes button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--on-accent);
 }
 
 .move-mode button:focus-visible,
-.squad-teams button:focus-visible {
+.squad-teams button:focus-visible,
+.season-scopes button:focus-visible {
   outline-offset: -2px;
 }
 
@@ -6229,4 +6235,243 @@ button.danger:hover:not(:disabled) {
 
 .link-button:hover {
   text-decoration: underline;
+}
+
+/* Player season */
+
+/* The panel of a player's Profile tab: its groups keep the room between them they have in the body itself. */
+.profile-panel > * + * {
+  margin-top: 22px;
+}
+
+/* The Season tab: the switch, the figures, the groups, a note on the percentiles and the table of competitions. Its
+   width decides how many figures and groups share a row. */
+.season-tab {
+  display: grid;
+  gap: 18px;
+  container-type: inline-size;
+}
+
+.season-tab > p {
+  margin: 0;
+}
+
+.season-scopes {
+  justify-self: start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.season-scopes button {
+  padding: 4px 12px;
+  font-size: 13px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* The figures at the top, as the almanac sets a season's line: a label in small capitals over a large figure and a
+   note, four to a row, parted by hairlines. */
+.season-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.season-figure {
+  min-width: 0;
+  padding: 8px 10px 9px;
+  background: var(--panel);
+}
+
+.season-figure dt {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-stretch: 88%;
+  font-weight: 750;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.season-figure dd {
+  margin: 2px 0 0;
+}
+
+.season-figure-value {
+  display: block;
+  font-size: 22px;
+  font-stretch: 85%;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.season-figure-note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* The cards in the Cards figure, in the colours they are on the pitch. */
+.season-card {
+  display: inline-block;
+  width: 10px;
+  height: 14px;
+  margin-right: 5px;
+  border-radius: 1px;
+  vertical-align: -1px;
+}
+
+.season-card.yellow {
+  background: #f2c200;
+}
+
+.season-card.red {
+  margin-left: 14px;
+  background: #d7263d;
+}
+
+/* The groups, two to a row. */
+.season-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 16px;
+  align-items: start;
+}
+
+/* A group's rows, as the profile's label and value rows: the name, the season's figure, the value per 90 or the rate,
+   and the percentile. */
+.season-metrics {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.season-metrics tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.season-metrics tbody tr:nth-child(even) {
+  background: var(--zebra);
+}
+
+.season-metrics :is(th, td) {
+  height: 27px;
+  padding: 2px 4px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.season-metrics th {
+  width: 100%;
+  color: var(--muted);
+  text-align: left;
+  white-space: normal;
+}
+
+.season-measure {
+  font-weight: 750;
+}
+
+.season-lower {
+  margin-left: 4px;
+  color: var(--muted);
+  cursor: help;
+}
+
+/* A percentile: a bar in the band of FM's ratings it falls in, and the number. */
+.season-percentile {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.season-percentile-track {
+  width: 56px;
+  height: 6px;
+  background: var(--border);
+}
+
+.season-percentile-fill {
+  display: block;
+  height: 100%;
+}
+
+.season-percentile-value {
+  min-width: 22px;
+  font-stretch: 85%;
+  font-weight: 800;
+}
+
+.season-percentile-fill.tier-1 {
+  background: var(--tier-1);
+}
+
+.season-percentile-fill.tier-2 {
+  background: var(--tier-2);
+}
+
+.season-percentile-fill.tier-3 {
+  background: var(--tier-3);
+}
+
+.season-percentile-fill.tier-4 {
+  background: var(--tier-4);
+}
+
+.season-percentile-value.tier-1 {
+  color: var(--tier-1);
+}
+
+.season-percentile-value.tier-2 {
+  color: var(--tier-2);
+}
+
+.season-percentile-value.tier-3 {
+  color: var(--tier-3);
+}
+
+.season-percentile-value.tier-4 {
+  color: var(--tier-4);
+}
+
+/* The table of competitions: read, not picked, and the team under each competition's name. */
+.season-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+}
+
+.season-grid tbody tr {
+  cursor: default;
+}
+
+.season-grid :is(th, td) {
+  padding: 6px 7px;
+}
+
+.season-competition {
+  font-weight: 700;
+}
+
+.season-grid td .sub {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* In a profile too narrow for four figures and two groups to a row: two figures, and the groups one under another. */
+@container (max-width: 640px) {
+  .season-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .season-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
