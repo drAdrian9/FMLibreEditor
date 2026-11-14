@@ -74,6 +74,11 @@ enum BridgeAction {
 
 #[derive(Subcommand)]
 enum Command {
+    /// List the competitions (db::COMP) whose name holds TEXT: address, names, nation, and the game's object for each.
+    Comps {
+        /// Words to look for in the competition's full or short name.
+        text: String,
+    },
     /// Show a player's statistics this season, a line per competition.
     Season {
         /// The player's unique ID.
@@ -1273,6 +1278,10 @@ fn run(cli: Cli) -> Result<()> {
                 TieArg::Permit => (Tie::WorkPermit, TieUid::Nation(target)),
             };
             tie_change(&session, uid, Some(TieAction::Add { tie, target, rule }), restore)
+        }
+        Command::Comps { text } => {
+            let modules = list_modules(&process).context("listing modules")?;
+            comps(&process, &modules, &text)
         }
         Command::Season { uid, competitions } => {
             season(&Session::connect(process, ArraySource::ProfileFirst)?, uid, competitions)
@@ -7284,5 +7293,30 @@ fn season(session: &Session, uid: u32, competitions: bool) -> Result<()> {
         "  club competitions: {} apps, {} min, {} goals, {} assists",
         all.appearances, all.minutes, all.goals, all.assists
     );
+    Ok(())
+}
+
+/// Prints the competitions whose full or short name holds `text`.
+fn comps(process: &Process, modules: &[Module], text: &str) -> Result<()> {
+    let plugin = find_module(modules, GAME_PLUGIN).with_context(|| format!("{GAME_PLUGIN} is not loaded"))?;
+    let vtables = class_vtables(process, plugin, "db::COMP")?;
+    let objects: Vec<u64> = words_equal_to(process, 0x1_0000, 0x7FFF_FFFF_0000, &vtables)
+        .into_iter()
+        .map(|(at, _)| at)
+        .filter(|&at| !(plugin.base..plugin.end()).contains(&at))
+        .collect();
+    let wanted = fmlibre_core::fold(text);
+    let name_at = |at: u64, offset: u64| {
+        process.read_u64(at + offset).ok().and_then(|ptr| fmlibre_core::read_fm_string(process, ptr)).unwrap_or_default()
+    };
+    println!("{} competitions", objects.len());
+    for at in objects {
+        let (full, short) = (name_at(at, 0x40), name_at(at, 0x48));
+        if !fmlibre_core::fold(&full).contains(&wanted) && !fmlibre_core::fold(&short).contains(&wanted) {
+            continue;
+        }
+        let game = process.read_u64(at + 0xB0).unwrap_or(0);
+        println!("  {at:#x}  {full} ({short})  game object {game:#x}");
+    }
     Ok(())
 }
